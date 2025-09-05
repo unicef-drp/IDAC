@@ -1,0 +1,465 @@
+---
+title: "IDAC Focus countries Key numbers 2024"
+date: 2024/04/09
+format: docx
+editor: visual
+---
+
+Script to have descriptive numbers on the situation of children on the move for the potential IDAC focus countries for the EU grant.
+
+All analysis done for ages 0-17, unless noted.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+rm(list=ls())
+library(countrycode)
+library(extrafont)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(gt)  #for pretty table printing
+library(janitor)
+library(scales)
+library(stringr)
+library(tidyr)
+
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+#Color palettes
+#UNICEF blue and secondary colors
+unicef_colors <- c("#1CABE2", "#00833D", "#80BD41", 
+                   "#FFC20E", "#F26A21", "#E2231A",
+                   "#961A49", "#6A1E74", "#D8D1C9", 
+                   "#777779", "#2D2926", "#374EA2")
+
+unicef_colors_tri <- c("#14789e", "#1CABE2", "#60c4eb", 
+                       "#b3880a", "#ffc20e", "#ffd456",
+                       "#535355", "#777779", "#a0a0a1")
+
+#bin UNICEF cyan - UNICEF cyan (20%)
+unicef_colors_bin <- c("#1CABE2", "#d2eef9")
+
+#format numbers
+format_million <- function(x){
+  return(paste0(round(x/1000000, digits=1), "M"))
+}
+format_nomillion <- function(x){
+  return(round(x/1000000, digits=1))
+}
+```
+
+# Load files
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+
+path.basic <- file.path('C:/Users/palma/OneDrive - UNICEF/Migration and Displacement/Data/')
+input <- file.path(path.basic, "UNPD/UNMigrantStock2020")
+input.wpp <- file.path(path.basic, "UNPD/WPP2022")
+input.unicef <- file.path(path.basic, "UNICEF")
+#input.unsd <- file.path(path.basic, "UNSD")
+input.unhcr <- file.path(path.basic, "UNHCR/GlobalTrends2022")
+input.idmc <- file.path(path.basic, "IDMC/IDMC2023")
+
+
+# load(file.path(input.wpp, "wpp_location.Rdata"))
+# load(file.path(input.wpp, "wpp_dem.Rdata"))
+# load(file.path(input.wpp, "wpp_age.Rdata"))
+load(file.path(input.wpp, "wpp_age_group.Rdata"))
+# load(file.path(input.wpp, "wpp_unicef.Rdata"))
+#load(file.path(input, "UN_MigrantStock.Rdata"))
+#load(file.path(input, "UN_MigrantStockByOriginAndDestination.Rdata"))
+load(file.path(input, "UN_MigrantStockAge0to17.Rdata"))
+#load(file.path(input, "UN_MigrantStockAge.Rdata"))
+load(file.path(input.unhcr,'unhcr2022.RData'))
+load(file.path(input.unhcr,'unhcr2022_demographic_estimate.RData'))
+# load(file.path(input.unhcr,'demref2021.imp.asy.RData'))
+# load(file.path(input.unhcr,'demref2021.imp.ori.rdata'))
+# load(file.path(input.unhcr,'demref2021.imp.asy.ori.unicef.rdata'))
+load(file.path(input.idmc,"idmc_2022.RData"))
+#load(file.path(input.wpp,"wpp_location.RData"))
+
+
+focus_countries <- c("KEN", "NAM", "NGA", "KHM", "IDN")
+```
+
+Regional definitions
+
+```{r}
+country.metadata <- read.csv("country_metadata_master.csv") |> 
+  select(iso3, 
+         unicefregion, 
+         m49region_level_1)
+```
+
+# Regional rank function
+
+```{r}
+regional_rank <- function(x, column){
+  #x <- mig.stock.2020
+  #column <- "Under 18"
+  x <- x |> left_join(wpp.location |> select(iso3, region), by='iso3') 
+  
+  result <- tibble(iso3=NA, rank=NA)
+  
+  for(region. in unique(x$region)){
+    #region. <- unique(x$region)[1]
+    x_region <- x |> filter(region ==region.) |> 
+      mutate(rank = rank(-get(column), ties.method= "max"))
+    
+    result <- result |> bind_rows(x_region |> select(iso3, rank))
+  }
+  
+  x <- x |> left_join(result, by='iso3')
+  
+  return(x$rank)
+}
+```
+
+# International migrants
+
+```{r}
+#unhcr.asy <- unhcr.gt.tab1.new |> filter(iso3 %in% focus_countries) |> select(area.unchcr, iso3, pop.ref, pop.asy)
+
+#Focus countries children population
+wpp.children <- wpp.age.group |>
+  filter(iso3 %in% focus_countries) |> 
+  filter(year == 2022) |>
+  select(iso3, pop0to17.thsd)
+
+#Focus countries UN migrant stock
+mig.stock.2020 <- mig.stock.0to17 |> 
+  filter(year==2020) |> 
+  filter(sex=="both") |> 
+  select(year, iso3, "Under 18" = pop.mig.0to17) |> 
+  mutate ("Under 18 Global Rank" =rank(-`Under 18`, ties.method= "max"))
+
+mig.stock.2020$`Under 18 Regional Rank` <- regional_rank(mig.stock.2020, column="Under 18")
+  
+mig.stock.2020 <- mig.stock.2020 |> filter(iso3 %in% focus_countries)
+```
+
+## Top 10
+
+```{r}
+x <- mig.stock.0to17 |>
+  filter(year== 2020) |> 
+  filter(sex=='both') |> 
+  left_join(country.metadata, by='iso3')
+
+x.top10 <- x |> slice_max(order_by=pop.mig.0to17, n=10) |> select(area, pop.mig.0to17) 
+
+x.top10.unicefregion <- tibble()
+for(i in unique(x$unicefregion)){
+  x.unicefregion <- x |>  
+    filter(unicefregion == i) |> 
+    slice_max(order_by=pop.mig.0to17, n=10) |> 
+    select(unicefregion, area, pop.mig.0to17)
+  x.top10.unicefregion <- x.top10.unicefregion |> bind_rows(x.unicefregion)
+}
+
+x.top10.m49region <- tibble()
+for(i in unique(x$m49region_level_1)){
+  x.m49region <- x |>  
+    filter(m49region_level_1 == i) |> 
+    slice_max(order_by=pop.mig.0to17, n=10) |> 
+    select(m49region_level_1, area, pop.mig.0to17)
+  x.top10.m49region <- x.top10.m49region |> bind_rows(x.m49region)
+}
+
+```
+
+## Summary chart
+
+```{r, eval=FALSE}
+mig.stock.sum <- mig.stock |> group_by(year, `Age Group`) |>
+  summarise(value=sum(value, na.rm=T), .groups = 'drop') |> 
+  mutate(value_label = format_nomillion(value))
+
+
+#Number of migrants by age in the region
+mig.stock.0to17.2020 <- mig.stock.sum |> filter(year==2020 & `Age Group` == "Under 18") |> pull(value)
+mig.stock.18to64.2020 <- mig.stock.sum |> filter(year==2020 & `Age Group` == "18 to 64") |> pull(value)
+mig.stock.65plus.2020 <- mig.stock.sum |> filter(year==2020 & `Age Group` == "65+") |> pull(value)
+
+paste0("2020 Total migrants in the region: ", format_million(mig.stock.0to17.2020+mig.stock.18to64.2020+mig.stock.65plus.2020))
+paste0("2020 Total migrant children in the region: ", format_million(mig.stock.0to17.2020))
+
+
+print(paste0(round(100*mig.stock.0to17.2020/(mig.stock.0to17.2020 + mig.stock.18to64.2020+mig.stock.65plus.2020))
+, "% of migrants in the IGC region are children"))
+
+print(paste0("1 in ", round(1/(mig.stock.0to17.2020/sum(1000*wpp.children$pop0to17.thsd))), " children in the IGC region is a migrant"))
+
+print(paste0(round(100*mig.stock.0to17.2020/35502537), "% of migrant children globally live in the region"))
+
+g1 <- ggplot(mig.stock.sum, aes(x=factor(year), y=value, fill=`Age Group`)) +
+  geom_bar(stat = "identity")+
+  geom_text(aes(label=value_label), position=position_stack(vjust = .5), family="Arial Black", color="#004564")+
+  scale_fill_manual(values=c("#A1DCF8", "#D2DA20","#59B8DE"))+
+  theme_minimal()+
+  theme(axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        panel.grid = element_blank())
+ggsave(filename = "migstock_focus_countries.jpeg", width = 15, height = 8, units='cm')
+
+```
+
+# Forcibly displaced country of asylum
+
+```{r}
+
+#Focus countries Refugees by country of asylum
+unhcr.asy.children <- unhcr.gt.estimate.country.asylum |> 
+  select(iso3=asylum_iso3, "Refugee children in asylum" =children_mean) |> 
+  mutate ("Global Rank Asylum country" =rank(-`Refugee children in asylum`, ties.method= "max"))
+
+unhcr.asy.children$`Regional Rank Asylum country` <- regional_rank(unhcr.asy.children, column="Refugee children in asylum")
+  
+unhcr.asy.children <- unhcr.asy.children |> filter(iso3 %in% focus_countries)
+
+#countries age.sex coverage
+sexage.coverage.ref <- unhcr.gt.tab12.new |>   
+  filter(iso3 %in% focus_countries & pop.type== "Refugees") |> 
+  select(iso3, "Coverage Age in Asylum"= coverage.sex.age.asy)
+
+```
+
+## Top 10
+
+```{r}
+x <- unhcr.gt.estimate.country.asylum |> 
+  select(iso3=asylum_iso3, asylum_country, children_mean) |> 
+  left_join(country.metadata, by='iso3')
+
+ref.asy.top10 <- x |> 
+  slice_max(order_by=children_mean, n=10) |> 
+  select(region = asylum_country, children_mean)
+
+ref.asy.top10.unicefregion <- tibble()
+for(i in unique(x$unicefregion)){
+  x.unicefregion <- x |>  
+    filter(unicefregion == i) |> 
+    slice_max(order_by=children_mean, n=10) |> 
+    select(unicefregion, asylum_country, children_mean)
+  ref.asy.top10.unicefregion <- ref.asy.top10.unicefregion |> bind_rows(x.unicefregion)
+}
+
+ref.asy.top10.m49region <- tibble()
+for(i in unique(x$m49region_level_1)){
+  x.m49region <- x |>  
+    filter(m49region_level_1 == i) |> 
+    slice_max(order_by=children_mean, n=10) |> 
+    select(m49region_level_1, asylum_country, children_mean)
+  ref.asy.top10.m49region <- ref.asy.top10.m49region |> bind_rows(x.m49region)
+}
+```
+
+## Region summary
+
+```{r, eval=FALSE}
+
+#children forcibly displaced in the region
+for.dis.asy <- unhcr.asy.children |> 
+  select(asylum_iso3, children_mean) |> 
+  left_join(idmc.children |> select(iso3, idp.conf.stock.0to17,idp.dis.stock.0to17), by=c("asylum_iso3"="iso3")) |> 
+  summarise(Refugees=sum(children_mean),
+            `Asylum-seekers`=asy,
+            IDP.stock.conf = sum(idp.conf.stock.0to17, na.rm=T),
+            IDP.stock.dis= sum(idp.dis.stock.0to17, na.rm=T))
+
+IGC.for.dis <- for.dis.asy$Refugees+for.dis.asy$`Asylum-seekers`+for.dis.asy$IDP.stock.conf
+
+print("IDAC Focus countries: Children Refugees, IDP Conflict and violence, IDP Disaster: ")
+format_million(for.dis.asy)
+print(paste0("IDAC Focus countries:  children forcibly displaced: ", format_million(IGC.for.dis)))
+
+print(paste0("1 in ", round(1/(IGC.for.dis/(IGC.pop0to17.thsd.2022*1000))), " children in IDAC Focus countries living in forced displacement as of 2022"))
+
+print(paste0("World Children IDP disaster: ", format_million(idmc.conf.dis.2022 |> filter(year==2022) |> pull(idp.dis.stock.0to17) |> sum(na.rm=T))))
+
+print(paste0("1 in ", round(1/(43298355/(world.pop0to17.thsd.2022*1000))), " children in the world living in forced displacement as of 2022"))
+
+print(paste0("WORLD children  new displacements by conflict: ", idmc.conf.dis.2022 |> filter(year==2022) |> pull(idp.conf.new.0to17) |> sum(na.rm = T) |> format_million()))
+print(paste0("WORLD children  new displacements by disasters: ", idmc.conf.dis.2022 |> filter(year==2022) |> pull(idp.dis.new.0to17) |> sum(na.rm = T) |> format_million()))
+```
+
+# Forcibly displaced country of origin
+
+```{r}
+unhcr.orig.children <- unhcr.gt.estimate.country.origin |> 
+  select(iso3=origin_iso3, "Refugee children from origin" =children_mean)|> 
+  mutate ("Global Rank Country of origin" =rank(-`Refugee children from origin`, ties.method= "max"))
+
+unhcr.orig.children$`Regional Rank Country of origin` <- regional_rank(unhcr.orig.children, column="Refugee children from origin")
+  
+unhcr.orig.children <- unhcr.orig.children |> filter(iso3 %in% focus_countries)
+
+#countries age.sex coverage Origin
+sexage.coverage.ref.orig <- unhcr.gt.tab13.new |>   
+  filter(iso3 %in% focus_countries & pop.type== "Refugees") |> 
+  select(iso3, "Coverage age in Origin" = coverage.sex.age.orig)
+
+```
+
+## Top 10
+
+```{r}
+x <- unhcr.gt.estimate.country.origin |> 
+  select(iso3=origin_iso3, origin_country, children_mean) |> 
+  left_join(country.metadata, by='iso3')
+
+ref.orig.top10 <- x |> 
+  slice_max(order_by=children_mean, n=10) |> 
+  select(region = origin_country, children_mean)
+
+ref.orig.top10.unicefregion <- tibble()
+for(i in unique(x$unicefregion)){
+  x.unicefregion <- x |>  
+    filter(unicefregion == i) |> 
+    slice_max(order_by=children_mean, n=10) |> 
+    select(unicefregion, origin_country, children_mean)
+  ref.orig.top10.unicefregion <- ref.orig.top10.unicefregion |> bind_rows(x.unicefregion)
+}
+
+ref.orig.top10.m49region <- tibble()
+for(i in unique(x$m49region_level_1)){
+  x.m49region <- x |>  
+    filter(m49region_level_1 == i) |> 
+    slice_max(order_by=children_mean, n=10) |> 
+    select(m49region_level_1, origin_country, children_mean)
+  ref.orig.top10.m49region <- ref.orig.top10.m49region |> bind_rows(x.m49region)
+}
+```
+
+# IDP
+
+```{r}
+
+idmc.children <- idmc.conf.dis.2022 |>
+  filter(year==2022) |> 
+  mutate ("Global Rank IDP Conflict" =rank(-`idp.conf.stock.0to17`, ties.method= "max")) |> 
+  mutate ("Global Rank IDP Disaster" =rank(-`idp.dis.stock.0to17`, ties.method= "max"))
+
+idmc.children$`Regional Rank IDP Conflict` <- regional_rank(idmc.children, column="idp.conf.stock.0to17")
+idmc.children$`Regional Rank IDP Disaster` <- regional_rank(idmc.children, column="idp.dis.stock.0to17")
+  
+idmc.children <- idmc.children |> 
+  filter(iso3 %in% focus_countries) |> 
+  select(iso3, idp.conf.stock.0to17,
+         "Global Rank IDP Conflict",
+         "Regional Rank IDP Conflict",
+         idp.dis.stock.0to17,
+         "Global Rank IDP Disaster",
+         "Regional Rank IDP Disaster")
+
+```
+
+## Top 10
+
+```{r}
+x <- idmc.conf.dis.2022 |> 
+  filter(year==2022) |> 
+  select(iso3, area.idmc, idp.conf.stock.0to17) |> 
+  left_join(country.metadata, by='iso3')
+
+idp.conf.top10 <- x |> 
+  slice_max(order_by=idp.conf.stock.0to17, n=10, na_rm = TRUE) |> 
+  select(region = area.idmc, idp.conf.stock.0to17)
+
+idp.conf.top10.unicefregion <- tibble()
+for(i in unique(x$unicefregion)){
+  x.unicefregion <- x |>  
+    filter(unicefregion == i) |> 
+    slice_max(order_by=idp.conf.stock.0to17, n=10, na_rm = TRUE) |> 
+    select(unicefregion, area.idmc, idp.conf.stock.0to17)
+  idp.conf.top10.unicefregion <- idp.conf.top10.unicefregion |> bind_rows(x.unicefregion)
+}
+
+idp.conf.top10.m49region <- tibble()
+for(i in unique(x$m49region_level_1)){
+  x.m49region <- x |>  
+    filter(m49region_level_1 == i) |> 
+    slice_max(order_by=idp.conf.stock.0to17, n=10, na_rm = TRUE) |> 
+    select(m49region_level_1, area.idmc, idp.conf.stock.0to17)
+  idp.conf.top10.m49region <- idp.conf.top10.m49region |> bind_rows(x.m49region)
+}
+
+
+x <- idmc.conf.dis.2022 |> 
+  filter(year==2022) |> 
+  select(iso3, area.idmc, idp.dis.stock.0to17) |> 
+  left_join(country.metadata, by='iso3')
+
+idp.dis.top10 <- x |> 
+  slice_max(order_by=idp.dis.stock.0to17, n=10, na_rm = TRUE) |> 
+  select(region = area.idmc, idp.dis.stock.0to17)
+
+idp.dis.top10.unicefregion <- tibble()
+for(i in unique(x$unicefregion)){
+  x.unicefregion <- x |>  
+    filter(unicefregion == i) |> 
+    slice_max(order_by=idp.dis.stock.0to17, n=10, na_rm = TRUE) |> 
+    select(unicefregion, area.idmc, idp.dis.stock.0to17)
+  idp.dis.top10.unicefregion <- idp.dis.top10.unicefregion |> bind_rows(x.unicefregion)
+}
+
+idp.dis.top10.m49region <- tibble()
+for(i in unique(x$m49region_level_1)){
+  x.m49region <- x |>  
+    filter(m49region_level_1 == i) |> 
+    slice_max(order_by=idp.dis.stock.0to17, n=10, na_rm = TRUE) |> 
+    select(m49region_level_1, area.idmc, idp.dis.stock.0to17)
+  idp.dis.top10.m49region <- idp.dis.top10.m49region |> bind_rows(x.m49region)
+}
+```
+
+# Merging tables
+
+```{r}
+
+final.table <- mig.stock.2020 |> 
+  left_join(unhcr.asy.children, by="iso3") |> 
+  left_join(sexage.coverage.ref, by="iso3") |> 
+  left_join(unhcr.orig.children, by="iso3") |> 
+  left_join(sexage.coverage.ref.orig, by="iso3") |> 
+  left_join(idmc.children, by="iso3")
+
+write.table(final.table, file ="Key numbers.csv", sep=',', row.names = F)
+```
+
+# Excel top 10
+
+```{r}
+library(xlsx)
+
+write.xlsx(x.top10|> as.data.frame(), file="top10.xlsx", sheetName="Migrant Top 10", row.names=FALSE)
+write.xlsx(x.top10.unicefregion|> as.data.frame(), file="top10.xlsx", sheetName="Migrant Top 10 UNICEF", append=TRUE, row.names=FALSE)
+write.xlsx(x.top10.m49region|> as.data.frame(), file="top10.xlsx", sheetName="Migrant Top 10 M49", append=TRUE, row.names=FALSE)
+
+write.xlsx(ref.asy.top10|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Asylum Top 10", append=TRUE, row.names=FALSE)
+write.xlsx(ref.asy.top10.unicefregion|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Asylum Top 10 UNICEF", append=TRUE, row.names=FALSE)
+write.xlsx(ref.asy.top10.m49region|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Asylum Top 10 M49", append=TRUE, row.names=FALSE)
+
+write.xlsx(ref.orig.top10|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Origin Top 10", append=TRUE, row.names=FALSE)
+write.xlsx(ref.orig.top10.unicefregion|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Origin Top 10 UNICEF", append=TRUE, row.names=FALSE)
+write.xlsx(ref.orig.top10.m49region|> as.data.frame(), file="top10.xlsx", sheetName="Refugee Origin Top 10 M49", append=TRUE, row.names=FALSE)
+
+write.xlsx(idp.conf.top10 |> as.data.frame(), file="top10.xlsx", sheetName="IDP Conflict Top 10", append=TRUE, row.names=FALSE)
+write.xlsx(idp.conf.top10.unicefregion|> as.data.frame(), file="top10.xlsx", sheetName="IDP Conflict Origin Top 10 UNICEF", append=TRUE, row.names=FALSE)
+write.xlsx(idp.conf.top10.m49region|> as.data.frame(), file="top10.xlsx", sheetName="IDP Conflict Origin Top 10 M49", append=TRUE, row.names=FALSE)
+
+write.xlsx(idp.dis.top10 |> as.data.frame(), file="top10.xlsx", sheetName="IDP Disaster Top 10", append=TRUE, row.names=FALSE)
+write.xlsx(idp.dis.top10.unicefregion|> as.data.frame(), file="top10.xlsx", sheetName="IDP Disaster Origin Top 10 UNICEF", append=TRUE, row.names=FALSE)
+write.xlsx(idp.dis.top10.m49region|> as.data.frame(), file="top10.xlsx", sheetName="IDP Disaster Origin Top 10 M49", append=TRUE, row.names=FALSE)
+
+```
