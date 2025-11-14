@@ -30,6 +30,12 @@ See [*DW_DemogMigration/03_raw_to_RData*](https://github.com/unicef-drp/DW-Demog
 
 ## Updates
 
+2025.10.07
+
+-   Moving forward with 2025 version
+
+-   Start using data directly from DW
+
 2025.06.06
 
 -   Start of 2025 update

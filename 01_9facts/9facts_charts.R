@@ -1,93 +1,94 @@
-
 # FACT 1: Mig Stock ----
-mig.stock.0to17 <- mig.stock.0to17 |> mutate(pop.mig.0to17 = pop.mig.0to17.eu)
-
-
-mig.stock.0to17.wld <- filter(mig.stock.0to17, sex=="both") |>
-  select(year, pop.mig.total, pop.mig.0to17) |>
+  
+fig1 <- mig.stock.0to17 |>
+  filter(sex == "both") |>
+  mutate(pop.mig.adult = pop.mig.total - pop.mig.0to17.eu) |> 
+  select(year, pop.mig.adult, pop.mig.0to17.eu) |>
   group_by(year) |>
   summarise_all(sum, na.rm = T) |> 
-  mutate(area.id=900) |>
-  left_join(subset(mig.stock, sex=="both"&area.id==900, select=c(year, area.id, pop.mig)), by=c("area.id", "year")) |>
-  mutate(check=ifelse(pop.mig.total==pop.mig, 1, 0)) # Check if aggregated migrant 0to17 match with migrant stock r data file
+  rename(`18+ years` = pop.mig.adult, `Under 18 years` = pop.mig.0to17.eu) |> 
+  pivot_longer(cols = `18+ years`:`Under 18 years`) |> 
+  mutate(value = value / 1000000,
+         label = round(value, 0))
+fig1$name <- factor(fig1$name, levels = c("18+ years", "Under 18 years"))
 
-pop.mig.0to17.wld <- wpp.age.group |>
-  select(area, area.id, year, pop0to17.thsd, poptotal.thsd) |>
-  filter(area == "WORLD" & year >= 1990 & year <= 2020) |>
-  left_join(select(mig.stock.0to17.wld, area.id, year, pop.mig.0to17, pop.mig), by= c("year", "area.id")) |>
-  mutate(mig.0to17.pct = pop.mig.0to17/(pop0to17.thsd*1000)*100,
-         mig.pct = pop.mig/(poptotal.thsd*1000)*100) |>
-  filter(!is.na(pop.mig))
+fig1.dashed <- tribble(~year, ~value, ~name,
+                       2020, 245.08349 + 35.51462, NA,
+                       2024, 304021813 / 1000000, NA)
+fig1.dashed2 <- tribble(~year, ~value, ~name,
+                       2020, 35.51462, NA,
+                       2024, 42.5, NA)
 
-fig1 <- filter(mig.stock.age, area.id==900 & sex=="both") |>
-  select(year:pop.mig) |>
-  filter(age.group %in% c("65to69", "70to74", "75plus", "total")) |>
-  spread(key=age.group, value=pop.mig) |>
-  mutate(`65plus` = `65to69`+`70to74`+`75plus`) |>
-  left_join(select(pop.mig.0to17.wld, year, area.id, pop.mig.0to17), by=c("area.id", "year")) |>
-  mutate(pop.mig.18to64= total-(pop.mig.0to17+`65plus`)) |>
-  select(year:area.id, pop.mig.0to17, pop.mig.18to64, `65plus`) |>
-  gather(key=age.group, value=pop.mig, pop.mig.0to17:`65plus`) |>
-  mutate(age.group=factor(age.group, levels=c("65plus","pop.mig.18to64","pop.mig.0to17")))
-
-# Plot 
-fact1 <- ggplot(fig1, aes(x = factor(year), y = pop.mig / 1000000, fill = age.group)) +
-  geom_bar(stat="identity", width = 0.7) +
-  geom_text(aes(label = round(pop.mig / 1000000, 0)),position = "stack", colour = "#004d6d", size = 3, fontface="bold", vjust = 1.5, hjust = "center")+
-  scale_fill_manual(values = c("#a1dcf8", "#d2da20", "#59b8de"), name="", labels=c("65+", "18 to 64", "Under 18")) +
-  scale_x_discrete(breaks=c(1990, 1995, 2000, 2005, 2010, 2015, 2020)) +
-  # guides(fill = guide_legend(reverse=TRUE)) +
-  theme_classic()+
-  theme(axis.line.x = element_line(size=0.5, colour="grey"),
+fact1 <- ggplot(fig1, aes(x = factor(year), y = value, group = name, color = name)) +
+  geom_line(stat = "identity", position = "stack", linewidth = 2) +
+  geom_line(data = fig1.dashed, stat = "identity", linewidth = 2, linetype = "dashed", show.legend = FALSE, color = "#0092C433") +
+  geom_line(data = fig1.dashed2, stat = "identity", linewidth = 2, linetype = "dashed", show.legend = FALSE, color = "#00B40033") +
+  geom_text(aes(label = label), position = "stack", size = 3, fontface = "bold", vjust = -1, hjust = "center", show.legend = FALSE)+
+  scale_color_manual(values = c("#0092C4", "#00B400"), 
+                     breaks = c("18+ years", "Under 18 years"),
+                     name = "") +
+  scale_x_discrete(breaks = c(1990, 1995, 2000, 2005, 2010, 2015, 2020, 2024)) +
+  xlab("Year") +
+  theme_classic() +
+  theme(axis.line.x = element_line(linewidth = 0.5, colour = "grey"),
         axis.line.y = element_blank(), 
-        axis.title = element_blank(),
-        axis.text.x= element_text(size = 8),
+        axis.title.y = element_blank(),
         axis.text.y = element_blank(),
+        #axis.text.y = element_text(size = 8),
         axis.ticks = element_blank(),
         legend.position = "right",
         legend.text = element_text(size = 8))
-fact1
-ggsave(filename = "output/fact1.pdf",device = "pdf")
+print(fact1)
+ggsave(plot = fact1,
+       filename = file.path(projectFolder, "fact1.pdf"), device = "pdf")
 
+approx.2024 <- mig.stock.0to17 |>
+  filter(sex == "both") |>
+  select(year, pop.mig.total, pop.mig.0to17.eu) |>
+  group_by(year) |>
+  summarise_all(sum, na.rm = T) |> 
+  mutate(pop.mig.0to17.eu.perc = pop.mig.0to17.eu / pop.mig.total,
+         approx.2024 =  round(pop.mig.0to17.eu.perc * 304021813 / 1000000))
 
+## fact1.xls ----
+fact1.xls <- fig1 |> 
+  mutate(OBS_VALUE = value/1000000) |> 
+  select(year, name, OBS_VALUE, label)
 
 # FACT 2: Mig Origin-Dest  ----
+orig.dest.region <- mig.stock.dest.orig |>
+  filter(Location.dest %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |> 
+  filter(Location.orig %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |> 
+  filter(year == 2024) |>
+  mutate(pop.mig = pop.mig / 1000000) |> 
+  select(Location.orig, Location.dest, pop.mig)
 
-library(circlize)
-orig.dest.region <- mig.stock.orig.dest |>
-  filter(year == 2020, dest.area.id < 900,orig.area.id < 900 | orig.area.id == 2003) |>
-  select(orig.region, dest.region, pop.mig) |>
-  group_by(orig.region, dest.region) |>
-  summarize(pop.mig = sum(pop.mig)) |>
-  arrange(desc(pop.mig)) |> ungroup()|> mutate(orig.region = replace_na(orig.region, "Other"), pop.mig = pop.mig/1000000) #origin and destination by major area
+my_colors <- c("AFRICA" = "#00B520", 
+               "EUROPE" = "#0090C2", 
+               "LATIN AMERICA AND THE CARIBBEAN" = "#FFC52F",
+               "ASIA" = "#EB143C", 
+               "NORTHERN AMERICA" = "#79499C",
+               "OCEANIA" = "#F1803C")
+#grid.col = c("#b21f8c","#29a9e0","#8cc540","#fcda00","#39a443","#e87621", "grey")
 
-
-pdf(file="outputs/fact2.pdf")
-
+pdf(file = file.path(projectFolder, "fact2.pdf"))
 
 circos.clear()
 circos.par(start.degree = 90, canvas.ylim = c(-1.1,1.1), gap.degree = 4, track.margin = c(-0.1, 0.1), points.overflow.warning = FALSE)
 par(mar = rep(0.5, 4))
 
-# color palette
-# colfunc <- colorRampPalette(c("#0083CF", "white"))
-#
-# mycolor <- colfunc(length(concerned_ctries)+6)
-#mycolor <- mycolor[sample(1:(length(concerned_ctries)+6))]
-
 # Base plot
-chordDiagram(
-  x = orig.dest.region ,
-  grid.col = c("#b21f8c","#29a9e0","#8cc540","#fcda00","grey","#39a443","#e87621"),
-  transparency = 0.25,
-  directional = 1,
-  direction.type = c("arrows", "diffHeight"),
-  diffHeight  = -0.04,
-  annotationTrack = "grid",
-  annotationTrackHeight = c(0.05, 0.1),
-  link.arr.type = "big.arrow",
-  link.sort = TRUE,
-  link.largest.ontop = TRUE)
+chordDiagram(x = orig.dest.region ,
+             grid.col = my_colors,
+             transparency = 0.25,
+             directional = 1,
+             direction.type = c("arrows", "diffHeight"),
+             diffHeight  = -0.04,
+             annotationTrack = "grid",
+             annotationTrackHeight = c(0.05, 0.1),
+             link.arr.type = "big.arrow",
+             link.sort = TRUE,
+             link.largest.ontop = TRUE)
 
 circos.trackPlotRegion(
   track.index = 1,
@@ -98,69 +99,74 @@ circos.trackPlotRegion(
     sector.index = get.cell.meta.data("sector.index")
     
     # Add names to the sector.
-    circos.text(
-      x = mean(xlim),
-      y = 4,
-      labels = sector.index,
-      facing = "downward",
-      niceFacing = T,
-      cex = 0.7
-    )
+    circos.text(x = mean(xlim),
+                y = 4,
+                labels = sector.index,
+                facing = "downward",
+                niceFacing = T,
+                cex = 0.7)
     
     # Add graduation on axis
-    circos.axis(
-      h = "top",
-      major.at = NULL,
-      minor.ticks = 1,
-      major.tick.percentage = 0.5,
-      labels.niceFacing = TRUE,
-      labels.cex = 0.5)
+    circos.axis(h = "top",
+                major.at = NULL,
+                minor.ticks = 1,
+                major.tick.percentage = 0.5,
+                labels.niceFacing = TRUE,
+                labels.cex = 0.5)
   }
 )
-
 dev.off()
 
+region.internal <- function(region){
+  internal <- orig.dest.region |> filter(Location.orig == region, Location.dest == region) |> pull(pop.mig) 
+  world <- orig.dest.region |> filter(Location.orig == region) |> pull(pop.mig) |> sum()
+  perc.internal <- round(100 * internal / world)
+  
+  print(paste0("---------", region, "---------"))
+  print(paste0("Of the total ", round(world), " million migrants from ", region, ", ", perc.internal, "% stayed in the region"))
+}
+
+region.internal("ASIA")
+region.internal("EUROPE")
+region.internal("AFRICA")
+region.internal("LATIN AMERICA AND THE CARIBBEAN")
+region.internal("NORTHERN AMERICA")
+region.internal("OCEANIA")
+
+## fact2.xls ----
+fact2.xls <- orig.dest.region
 
 # FACT 4: Forcibly displaced ----
+fact4.idmc <- idmc.stock |> 
+  filter(cause == "Conflict" & sex == "Both sexes") 
 
-fact4.idmc <- idmc.stock.2008.2023 |> 
-  filter(cause=="Conflict" & sex == "Both sexes") 
-
-## Correcting Gaza  2023 --------------------------------------------------------------------------------------------------------------
-#IDMC estimates that in 2023, 70% of IDPs in Gaza are also registered as UNRWA refugees
+## Correcting Gaza 2023-2024 --------------------------------------------------------------------------------------------------------------
+#IDMC estimates that in 2023-2024, 70% of IDPs in Gaza are also registered as UNRWA refugees
 # To correct for this, we remove these registered refugees from IDMC numbers by conflict
-# We only keep 30% of the numbers from PSE in 2023.
+# We only keep 30% of the numbers from PSE in 2023 and 2024.
 # Because IDMC uses 3 groups for 0-17 data, we remove 70% from all groups
 
-# See: https://www.unhcr.org/refugee-statistics/insights/explainers/forcibly-displaced-pocs.html (Acessed on 2024-06-28)
-# Website saved as PDF in Migration and Displacement\Data\IDMC\IDMC2024\UNRWA Refugees in IDMC data 2023 Correction.pdf
-fact4.idmc[fact4.idmc$year==2023 & fact4.idmc$iso3 == "PSE",5:11] <- fact4.idmc[fact4.idmc$year==2023 & fact4.idmc$iso3 == "PSE",5:11]*.3
+# See: https://www.unhcr.org/refugee-statistics/insights/explainers/forcibly-displaced-pocs.html (Acessed on 2025-10-13)
+# Website saved as PDF in \Migration and Displacement/Forcibly displaced and stateless population categories _ UNHCR.pdf
+fact4.idmc[fact4.idmc$year %in% c(2023,2024) & fact4.idmc$ISO3Code == "PSE", 6:12] <- fact4.idmc[fact4.idmc$year %in% c(2023,2024) & fact4.idmc$ISO3Code == "PSE", 6:12] * .3
 
-# fact4.idmc.disaster <- idmc.stock.2008.2023 |> 
-#   filter(cause=="Disaster" & sex == "Both sexes", year == 2023) |> 
-#   group_by(year)|> 
-#   summarise(pop = sum(idp.stock, na.rm = T),
-#             pop.0to17 = sum(idp.stock.0to17, na.rm = T)) |> 
-#   mutate(pop.type = "Disaster-related\ninternally displaced children") |> 
-#   select(year, pop.type, pop, pop.0to17) 
-
-
-fact4.idmc <- fact4.idmc|> 
+fact4.idmc <- fact4.idmc |> 
   group_by(year)|> 
   summarise(pop = sum(idp.stock, na.rm = T),
             pop.0to17 = sum(idp.stock.0to17, na.rm = T)) |> 
   mutate(pop.type = "Conflict-related\ninternally displaced children") |> 
   select(year, pop.type, pop, pop.0to17) 
 
-fact4.unrwa <- unrwa.refugees |> 
-  mutate(pop.all = pop*(age=="all"),
-         pop.0to17 = pop*(age=="0to17")) |> 
-  filter(is.na(iso3)) |> 
+fact4.unrwa <- unrwa |> 
+  mutate(year = as.numeric(TIME_PERIOD),
+         pop = as.numeric(OBS_VALUE) * (AGE == "_T"),
+         pop.0to17 = as.numeric(OBS_VALUE) * (AGE == "Y0T17")) |> 
   group_by(year) |> 
-  summarise(pop = sum(pop.all),
+  summarise(pop = sum(pop),
             pop.0to17 = sum(pop.0to17)) |> 
   mutate(pop.type = "Palestine refugee children\n(registered with UNRWA)") |> 
   select(year, pop.type, pop, pop.0to17) 
+#fact4.unrwa$pop.0to17[fact4.unrwa$pop.0to17 == 0] <- NA  #Values are not zero, should be NA
 
 fact4.unhcr <- ref.asylum |> 
   group_by(year)|> 
@@ -183,35 +189,41 @@ fact4 <- bind_rows(fact4.idmc,
 
 fact4.yearly.summary <- fact4 |>
   group_by(year)|> 
-  summarise(pop=sum(pop),
+  summarise(pop = sum(pop),
             pop.0to17 = sum(pop.0to17),.groups = "drop") |> 
-  mutate(pop.0to17.prop=pop.0to17/pop,
-         pop=round(pop/1000000, digits = 1),
-         pop.0to17=round(pop.0to17/1000000, digits = 1))
+  mutate(pop.0to17.prop = pop.0to17/pop,
+         pop = round(pop / 1000000, digits = 1),
+         pop.0to17 = round(pop.0to17 / 1000000, digits = 1))
 
-fact4.2023.summary <- fact4 |> filter(year==2023) |> 
+fact4.2024.summary <- fact4 |>
+  filter(year == 2024) |> 
   group_by(pop.type) |> 
-  summarise(pop.0to17 = sum(pop.0to17),.groups = "drop")
+  summarise(pop.0to17 = sum(pop.0to17), .groups = "drop")
 
-
-fact4.2010.2017 <- fact4 |> 
-  filter(year %in% 2010:2017) |> 
+fact4.total <- fact4 |> 
+  filter(year %in% 2010:2024) |> 
   group_by(year) |>
   summarise(pop.0to17 = sum(pop.0to17)) |> 
   mutate(pop.type = "Total forcibly displaced children")
 
 fact4.2018.plus <- fact4 |> 
-  filter(year >=2018) 
+  filter(year >= 2018) |>
+  select (-pop)
 
-fact4.total.label <- fact4 |> 
-  filter(year>=2010) |> 
-  group_by(year) |>
-  summarise(pop.0to17 = sum(pop.0to17)) |> 
-  mutate(pop.type="Total")
+fact4_new <- bind_rows(fact4.total, fact4.2018.plus) |> 
+  mutate(pop.0to17 = pop.0to17 / 1000000,
+         pop.label = round(pop.0to17, digits = 1),
+         show.bar = if_else(pop.type == "Total forcibly displaced children" & year >= 2018, FALSE, TRUE))
 
-fact4_new <- bind_rows(fact4.2010.2017, fact4.2018.plus)
-fact4_new$pop.label <- fact4_new$pop.0to17
-fact4_new$pop.label[fact4_new$year < 2018] <- NA
+fact4.2024.unhcrunrwa <- fact4 |> 
+  filter(pop.type %in% c("Refugee and other internationally\ndisplaced children (UNHCR)",
+                         "Palestine refugee children\n(registered with UNRWA)",
+                         "Asylum-seeking children") ) |> 
+  filter(year == 2024) |> 
+  summarise(pop = sum(pop),
+            pop.0to17 = sum(pop.0to17)) |> 
+  mutate(perc = round(100 * pop.0to17 / pop))
+
 
 #order of labels
 fact4_new$pop.type <- factor(fact4_new$pop.type, levels = c("Total forcibly displaced children", 
@@ -227,109 +239,108 @@ cols <- c("Total forcibly displaced children" = "#0092C4",
           "Palestine refugee children\n(registered with UNRWA)" = "#39A443")
 
 # Plot 
-fact4.fig <- ggplot(fact4_new, aes(x = factor(year), y = pop.0to17 / 1000000, fill = pop.type)) +
-  geom_bar(stat="identity", width = 0.5) +
+fact4.fig <- ggplot(fact4_new |> filter(show.bar), aes(x = factor(year), y = pop.0to17, fill = pop.type)) +
+  geom_bar(stat = "identity", width = 0.5) +
   geom_text(data = fact4_new, 
-            mapping = aes(label = round(pop.label / 1000000, 1), y = pop.0to17/1000000), 
-            colour = "white",size = 3, fontface="bold",
+            mapping = aes(label = pop.label, y = pop.0to17), 
+            colour = "white", size = 3, fontface = "bold",
             position = position_stack(vjust = 0.5))+
-  geom_text(data = fact4.total.label, 
-            mapping = aes(label = round(pop.0to17 / 1000000, 1), y = pop.0to17/1000000, fill = NA), 
-            colour = "#0092C4", size = 4, fontface="bold", vjust=-.3)+
+  geom_text(data = fact4_new |> filter(pop.type == "Total forcibly displaced children"), 
+            mapping = aes(label = pop.label, y = pop.0to17), 
+            colour = "#0092C4", size = 4, fontface = "bold", vjust = -.3)+
   scale_fill_manual(values = cols,
                     name = "") +
-  scale_x_discrete(breaks=2010:2023) +
-  scale_y_continuous(limits = c(0,50)) +
+  scale_x_discrete(breaks = 2010:2024) +
+  scale_y_continuous(limits = c(0, 50)) +
   labs(x = NULL, y = NULL)+
   theme_classic() +
-  guides(fill=guide_legend(nrow=2,byrow=TRUE))+
-  theme(axis.line = element_line(colour = "grey50", size = 0.4),
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))+
+  theme(axis.line = element_line(colour = "grey50", linewidth = 0.4),
         axis.text = element_text(size = 8, color = "grey50"), 
-        axis.ticks = element_line(colour = "grey50", size = 0.4), 
+        axis.ticks = element_line(colour = "grey50", linewidth = 0.4), 
         axis.title = element_text(size = 8, color = "grey50"),
         legend.position="bottom", 
         legend.title=element_blank(), 
         plot.title = element_text(color = "#0092C4"),
         plot.subtitle = element_text(color = "#0092C4"))
-
 print(fact4.fig)
 ggsave(filename = file.path(projectFolder, "fact4.pdf"),
        device = "pdf", width = 20, height = 20, units = "cm")
 
-
+## fact.xls ----
+fact4.xls <- fact4_new
 
 # FACT 5: Refugee Origin ----
-
 fact5 <- ref.origin |> 
-  filter(year==2023) |> 
-  filter(!(iso3 %in% c("UNK", "XXA", "TIB", "LUX", "PLW")) ) |> 
-  select(iso3, ref.0to17.estimate) |> 
-  left_join(country_regions |> select(iso3, country_abbr, sdgregion), by="iso3")
+  filter(year == 2024) |> 
+  filter(!(ISO3Code %in% c("UNK", "XXA", "TIB", "LUX", "PLW")) ) |> 
+  select(ISO3Code, ref.0to17.estimate) |> 
+  left_join(geo_areas , by = c("ISO3Code" = "id")) |> 
+  left_join(regions_sdg |> select(Region, Region_Code, ISO3Code), by = "ISO3Code")
 
-fact5$country.label <- fact5$country_abbr
-fact5$country.label[fact5$ref.0to17.estimate<100000] <- NA
-fact5$country.label[fact5$country.label == "Democratic Republic of the Congo"] <- "DRC"
-fact5$country.label[fact5$country.label == "Central African Republic"] <- "CAR"
-fact5$country.label[fact5$country.label == "Syrian Arab Republic"] <- "Syria"
+#Fixing country labels
+fact5$country.label <- fact5$name_abbr
+fact5$country.label[fact5$ref.0to17.estimate < 100000] <- NA
+#fact5$country.label[fact5$country.label == "Democratic Republic of the Congo"] <- "DRC"
+#fact5$country.label[fact5$country.label == "Central African Republic"] <- "CAR"
+#fact5$country.label[fact5$country.label == "Syrian Arab Republic"] <- "Syria"
+
+## Analysis by Region ----
+fact5_region <- fact5 |>
+  group_by(Region_Code) |> 
+  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |> 
+  arrange(desc(ref.0to17.region)) |> 
+  mutate(ref.0to17.region.mill = round(ref.0to17.region / 1000000, digits = 1),
+         ref.0to17.region.perc = 100 * ref.0to17.region / sum(ref.0to17.region),
+         ref.0to17.region.perc.cumul = round(cumsum(ref.0to17.region.perc)))
+View(fact5_region)
 
 fact5_toView <- fact5 |>
   arrange(desc(ref.0to17.estimate)) |> 
-  mutate(ref.0to17.estimate.perc = 100*ref.0to17.estimate/sum(ref.0to17.estimate),
-         cumul.perc = round(cumsum(ref.0to17.estimate.perc)),
+  mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
+         ref.0to17.estimate.perc.cumul = round(cumsum(ref.0to17.estimate.perc)),
          ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
-         ref.0to17.estimate.thousands=round(signif(ref.0to17.estimate, digits = 2)),
-         ref.0to17.estimate = round(ref.0to17.estimate / 1000000, digits = 1)) 
-
+         ref.0to17.estimate = round(signif(ref.0to17.estimate, digits = 2)),
+         ref.0to17.estimate.mill = round(ref.0to17.estimate / 1000000, digits = 1)) |> 
+  left_join(fact5_region |> select(Region_Code, ref.0to17.region), by = "Region_Code") |> 
+  mutate(perc.of.region = round(100 * (ref.0to17.estimate / ref.0to17.region))) |> 
+  select(ISO3Code, name, 
+         ref.0to17.estimate, ref.0to17.estimate.mill, ref.0to17.estimate.perc, ref.0to17.estimate.perc.cumul,
+         Region_Code, perc.of.region)
 View(fact5_toView)
 
-## FACT 5: Refugee Origin: Region ----
-fact5_toView_region <- fact5 |>
-  group_by(sdgregion) |> 
-  summarise(ref.0to17.estimate=sum(ref.0to17.estimate)) |> 
+fact5_toView_ssa <- fact5 |>
+  filter(Region_Code == "UNSDG_SUBSAHARANAFRICA")|>
   arrange(desc(ref.0to17.estimate)) |> 
-  mutate(ref.0to17.estimate.perc = 100*ref.0to17.estimate/sum(ref.0to17.estimate),
-         ref.0to17.estimate.millions = round(ref.0to17.estimate / 1000000, digits = 1))
-
-View(fact5_toView_region)
-
-#Syria percentage from Northern Africa and Western Asia
-round(100*2881392.4500/3902425.783)
-
-#Afghanistan percentage from Central and Southern Asia
-round(100*3142712.7500/3265533.697)
-
-#Ukraine percentage from Europe and Northern America
-round(100*1873858.3875/1925225.258)
-
-fact5_toView_ssa <- fact5 |> filter(sdgregion=="Sub-Saharan Africa")|>
-  arrange(desc(ref.0to17.estimate)) |> 
-  mutate(ref.0to17.estimate.perc = 100*ref.0to17.estimate/sum(ref.0to17.estimate),
+  mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
          cumul.perc = round(cumsum(ref.0to17.estimate.perc)),
          ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
-         ref.0to17.estimate.thousands=round(signif(ref.0to17.estimate, digits = 2)),
+         ref.0to17.estimate.thousands = round(signif(ref.0to17.estimate, digits = 2)),
          ref.0to17.estimate = round(ref.0to17.estimate / 1000000, digits = 1)) 
-
 View(fact5_toView_ssa)
 
-#total in SSA in millions 3703935.107
+## Analysis by Continent ----
+regions_continents <- regions |> filter(Regional_Grouping == "UNSDG_REGION_GLOBAL", Region %in% c("Africa", "Asia"))
+fact5_continent <- fact5 |>
+  left_join(regions_continents |> select(ISO3Code, Continent = Region), by = "ISO3Code") |> 
+  group_by(Continent) |> 
+  summarise(ref.0to17.continent = sum(ref.0to17.estimate), .groups = "drop") |> 
+  arrange(desc(ref.0to17.continent)) |> 
+  mutate(ref.0to17.continent.mill = round(ref.0to17.continent / 1000000, digits = 1),
+         ref.0to17.continent.perc = 100 * ref.0to17.continent / sum(ref.0to17.continent),
+         ref.0to17.continent.perc.cumul = round(cumsum(ref.0to17.continent.perc)))
+View(fact5_continent)
 
-
-
-## FACT 5: Refugee Origin: Chart ----
-
-library(igraph)
-library(ggraph)
-
-region_colors <- tibble(color_region=c("#EDA877","#EDA87770",
+## Chart ----
+region_colors <- tibble(color_region = c("#EDA877","#EDA87770",
                                        "#8C789E","#8C789E70",
                                        "#7FBA70","#7FBA7070",
                                        "#EAE8FF","#EAE8FF70",
                                        "#62ABC3","#62ABC370",
-                                       "#C978CF","#C978CF70",
-                                       "#E6738E","#E6738E70",
                                        "#FEE07F","#FEE07F70",
+                                       "#E6738E","#E6738E70",
                                        "#FFFFFF"),
-                        sdgregion=c("Eastern and South-Eastern Asia",
+                        Region = c("Eastern and South-Eastern Asia",
                                     "XEastern and South-Eastern Asia",
                                     "Central and Southern Asia",
                                     "XCentral and Southern Asia",
@@ -339,23 +350,20 @@ region_colors <- tibble(color_region=c("#EDA877","#EDA87770",
                                     "XNorthern Africa and Western Asia",
                                     "Europe and Northern America",
                                     "XEurope and Northern America",
-                                    "Oceania (excluding Australia and New Zealand)",
-                                    "XOceania (excluding Australia and New Zealand)",
+                                    "Oceania",
+                                    "XOceania",
                                     "Sub-Saharan Africa",
                                     "XSub-Saharan Africa",
-                                    "Australia and New Zealand",
-                                    "XAustralia and New Zealand",
                                     "World"))
 
 my_colors2 <- region_colors$color_region
-names(my_colors2) <- region_colors$sdgregion
+names(my_colors2) <- region_colors$Region
 
-
-df <- data_frame(group = fact5$sdgregion,
-                 subgroup = fact5$country_abbr)
+df <- tibble(group = fact5$Region,
+                 subgroup = fact5$name_abbr)
 #adding rows of regional levels
-df <- bind_rows(df, tibble(group=rep("World", length(region_colors$sdgregion[c(1,3,5,7,9,11,13,15)])),
-                           subgroup=region_colors$sdgregion[c(1,3,5,7,9,11,13,15)]))
+df <- bind_rows(df, tibble(group = rep("World", length(region_colors$Region[c(1, 3, 5, 7, 9,11, 13)])),
+                           subgroup = region_colors$Region[c(1, 3, 5, 7, 9, 11, 13)]))
 
 df <- as.data.frame(table(df))
 df <- filter(df, Freq > 0)
@@ -364,20 +372,19 @@ df <- filter(df, Freq > 0)
 vertices <- df |>
   dplyr::distinct(subgroup, Freq) |>
   dplyr::add_row(subgroup = "World", Freq = 0)|> 
-  left_join(fact5  |> select(country_abbr, ref.0to17.estimate, sdgregion), by=c("subgroup" ="country_abbr"))
+  left_join(fact5 |> select(name_abbr, ref.0to17.estimate, Region), by=c("subgroup" = "name_abbr"))
 
 vertices$ref.0to17.estimate[is.na(vertices$ref.0to17.estimate)] <- 0  #fill NA values of regions
 
 #region category names for special coloring
-vertices$sdgregion[vertices$subgroup=="Sub-Saharan Africa"] <- "XSub-Saharan Africa"
-vertices$sdgregion[vertices$subgroup=="Northern Africa and Western Asia"] <- "XNorthern Africa and Western Asia"
-vertices$sdgregion[vertices$subgroup=="Central and Southern Asia"] <- "XCentral and Southern Asia"
-vertices$sdgregion[vertices$subgroup=="Eastern and South-Eastern Asia"] <- "XEastern and South-Eastern Asia"
-vertices$sdgregion[vertices$subgroup=="Europe and Northern America"] <- "XEurope and Northern America"
-vertices$sdgregion[vertices$subgroup=="Latin America and the Caribbean"] <- "XLatin America and the Caribbean"
-vertices$sdgregion[vertices$subgroup=="Australia and New Zealand"] <- "XAustralia and New Zealand"
-vertices$sdgregion[vertices$subgroup=="Oceania (excluding Australia and New Zealand)"] <- "Oceania (excluding Australia and New Zealand)"
-vertices$sdgregion[vertices$subgroup=="World"] <- "World"
+vertices$Region[vertices$subgroup=="Sub-Saharan Africa"] <- "XSub-Saharan Africa"
+vertices$Region[vertices$subgroup=="Northern Africa and Western Asia"] <- "XNorthern Africa and Western Asia"
+vertices$Region[vertices$subgroup=="Central and Southern Asia"] <- "XCentral and Southern Asia"
+vertices$Region[vertices$subgroup=="Eastern and South-Eastern Asia"] <- "XEastern and South-Eastern Asia"
+vertices$Region[vertices$subgroup=="Europe and Northern America"] <- "XEurope and Northern America"
+vertices$Region[vertices$subgroup=="Latin America and the Caribbean"] <- "XLatin America and the Caribbean"
+vertices$Region[vertices$subgroup=="Oceania"] <- "XOceania"
+vertices$Region[vertices$subgroup=="World"] <- "World"
 
 #selecting which countries to show label
 min.pop.label <- 150000
@@ -391,220 +398,572 @@ vertices$name_label[vertices$name_label == "South Sudan"] <- "South\nSudan"
 
 #region labels
 vertices$region_label <- NA
-vertices$region_label [vertices$ref.0to17.estimate==0] <- vertices$subgroup[vertices$ref.0to17.estimate==0]
-vertices$region_label [vertices$region_label=="World"] <- NA
-vertices$ref.0to17.estimate[vertices$ref.0to17.estimate==0] <- 10000 #regional numbers must not be 0. Strange that this is not a problem for asylum
+vertices$region_label[vertices$ref.0to17.estimate == 0] <- vertices$subgroup[vertices$ref.0to17.estimate == 0]
+vertices$region_label[vertices$region_label == "World"] <- NA
+vertices$ref.0to17.estimate[vertices$ref.0to17.estimate == 0] <- 10000 #regional numbers must not be 0. Strange that this is not a problem for asylum
 
 graph <- graph_from_data_frame(df, vertices = vertices)
 
 ggraph(graph, layout = "circlepack", weight = ref.0to17.estimate) +
-  geom_node_circle(aes(fill = sdgregion, colour = as.factor(depth), group = depth), 
-                   size = 0.01) + #width of circle line
-  scale_fill_manual(values=my_colors2, 
-                    breaks=region_colors$sdgregion[c(1,3,5,7,9,11,13,15)]) + #adding breaks so the legend only shows the color of the country circles and not the lighter region circles
+  geom_node_circle(aes(fill = Region, colour = as.factor(depth), group = depth), 
+                   linewidth = 0.01) + #width of circle line
+  scale_fill_manual(values = my_colors2, 
+                    breaks = region_colors$Region[c(1,3,5,7,9,11,13)]) + #adding breaks so the legend only shows the color of the country circles and not the lighter region circles
   coord_fixed() +
   geom_node_text(aes(label = name_label), color = "black", repel = FALSE, size = 1.5, show.legend = F) +
   #geom_node_label(aes(label = region_label), color = "black", repel = TRUE, size = 2, show.legend = F) +
-  scale_color_manual( values=c("0" = "white", "1" = "darkgrey", "2" = "darkgrey" ) ) +
+  scale_color_manual(values = c("0" = "white", "1" = "darkgrey", "2" = "darkgrey" ) ) +
   theme_void()+
   guides(colour="none")+
   theme(legend.title = element_blank(),
         legend.text = element_text(size = 3),
         legend.key.size = unit(0.3, "cm"))
+ggsave(file.path(projectFolder, "fact5_origin.pdf"), width = 8, height = 5, units = "cm")
 
-ggsave(file.path(projectFolder, "fact5_origin.pdf"), width = 8, height = 5, units="cm")
+## fact5.xls ----
+fact5.xls <- fact5 |>
+  mutate(OBS_VALUE = round(ref.0to17.estimate)) |> 
+  select(name, Region, OBS_VALUE)
 
+# FACT 6: Refugee Asylum ----
+fact6 <- ref.asylum |> 
+  filter(year == 2024) |> 
+  filter(!(ISO3Code %in% c("UNK", "XXA", "TIB", "LUX", "PLW")) ) |> 
+  select(ISO3Code, ref.0to17.estimate) |> 
+  left_join(geo_areas , by = c("ISO3Code" = "id")) |> 
+  left_join(regions_sdg |> select(Region, Region_Code, ISO3Code), by = "ISO3Code")
 
-
-# FACT X Asylum income country ----
-data7.income <- unhcr.gt.tab12.new |> 
-  filter(area.id < 999) |> 
-  filter(pop.type %in% c("Refugees", "Other people in need of international protection")) |> 
-  mutate(pop.ref.data.sexage.available = pop.ref.asy*coverage.sex.age.asy) |> #population with known agesex
-  left_join(wb.income |> select(iso3, wb.income.2020), by="iso3") |> 
-  mutate(pop.ref.data.sexage.available = pop.ref.asy*coverage.sex.age.asy) |>   #population with msex and coverage. Different values for REF and OIP
-  group_by(country_abbr) |> 
-  summarise(wb.income.2020=unique(wb.income.2020),
-            pop.ref = sum(pop.ref.asy, na.rm = T),  #total ref population (REF+OIP)
-            pop.ref.data.sexage.available = sum(pop.ref.data.sexage.available), ##population with known agesex, combining REF and OIP
-            pop.ref.0to17 = sum(pop.ref.0to17.asy, na.rm = T)) |>   #children population, Only countries with >=0.5 agesex coverage
-  mutate(prop.ref.data.sexage.available = pop.ref.data.sexage.available/pop.ref,
-         country.label = NA) |> 
-  filter(prop.ref.data.sexage.available>=.5) |> 
-  select(wb.income.2020, country_abbr, pop.ref.0to17) |> 
-  group_by(wb.income.2020) |> 
-  summarise(pop.ref.0to17=sum(pop.ref.0to17))
-
-data7.income$prop.ref.0to17 <- data7.income$pop.ref.0to17/sum(data7.income$pop.ref.0to17)
-
-sum(data7.income$prop.ref.0to17[1:2])
+#Fixing country labels
+fact6$country.label <- fact6$name_abbr
+fact6$country.label[fact6$ref.0to17.estimate < 100000] <- NA
 
 
+## Analysis by Region ----
+fact6_region <- fact6 |>
+  group_by(Region_Code) |> 
+  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |> 
+  arrange(desc(ref.0to17.region)) |> 
+  mutate(ref.0to17.region.mill = round(ref.0to17.region / 1000000, digits = 1),
+         ref.0to17.region.perc = round(100 * ref.0to17.region / sum(ref.0to17.region)))
+View(fact6_region)
 
-# FACT 8 ----
+## Analysis by Continent ----
+regions_continents <- regions |> filter(Regional_Grouping == "UNSDG_REGION_GLOBAL", Region %in% c("Africa", "Asia"))
+fact6_continent <- fact6 |>
+  left_join(regions_continents |> select(ISO3Code, Continent = Region), by = "ISO3Code") |> 
+  group_by(Continent) |> 
+  summarise(ref.0to17.continent = sum(ref.0to17.estimate)) |> 
+  arrange(desc(ref.0to17.continent)) |> 
+  mutate(ref.0to17.continent.mill = round(ref.0to17.continent / 1000000, digits = 1),
+         ref.0to17.continent.perc = 100 * ref.0to17.continent / sum(ref.0to17.continent))
+View(fact6_continent)
+
+## Analysis by country ----
+fact6_toView <- fact6 |>
+  arrange(desc(ref.0to17.estimate)) |> 
+  mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
+         ref.0to17.estimate.perc.cumul = round(cumsum(ref.0to17.estimate.perc)),
+         ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
+         ref.0to17.estimate = round(signif(ref.0to17.estimate, digits = 2)),
+         ref.0to17.estimate.mill = round(ref.0to17.estimate / 1000000, digits = 1),
+         ref.0to17.estimate.thsd = signif(ref.0to17.estimate, digits = 2)) |> 
+  left_join(fact6_region |> select(Region_Code, ref.0to17.region), by = "Region_Code") |> 
+  mutate(perc.of.region = round(100 * (ref.0to17.estimate / ref.0to17.region))) |> 
+  select(ISO3Code, name, 
+         ref.0to17.estimate, ref.0to17.estimate.mill, ref.0to17.estimate.thsd,
+         ref.0to17.estimate.perc, ref.0to17.estimate.perc.cumul, 
+         Region_Code, perc.of.region)
+View(fact6_toView)
+
+fact6_toView_ssa <- fact6 |>
+  filter(Region_Code == "UNSDG_SUBSAHARANAFRICA")|>
+  arrange(desc(ref.0to17.estimate)) |> 
+  mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
+         cumul.perc = round(cumsum(ref.0to17.estimate.perc)),
+         ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
+         ref.0to17.estimate.thousands = round(signif(ref.0to17.estimate, digits = 2)),
+         ref.0to17.estimate = round(ref.0to17.estimate / 1000000, digits = 1)) 
+View(fact6_toView_ssa)
+
+## Chart ----
+region_colors <- tibble(color_region = c("#EDA877","#EDA87770",
+                                         "#8C789E","#8C789E70",
+                                         "#7FBA70","#7FBA7070",
+                                         "#EAE8FF","#EAE8FF70",
+                                         "#62ABC3","#62ABC370",
+                                         "#FEE07F","#FEE07F70",
+                                         "#E6738E","#E6738E70",
+                                         "#FFFFFF"),
+                        Region = c("Eastern and South-Eastern Asia",
+                                   "XEastern and South-Eastern Asia",
+                                   "Central and Southern Asia",
+                                   "XCentral and Southern Asia",
+                                   "Latin America and the Caribbean",
+                                   "XLatin America and the Caribbean",
+                                   "Northern Africa and Western Asia",
+                                   "XNorthern Africa and Western Asia",
+                                   "Europe and Northern America",
+                                   "XEurope and Northern America",
+                                   "Oceania",
+                                   "XOceania",
+                                   "Sub-Saharan Africa",
+                                   "XSub-Saharan Africa",
+                                   "World"))
+
+my_colors2 <- region_colors$color_region
+names(my_colors2) <- region_colors$Region
+
+df <- tibble(group = fact6$Region,
+             subgroup = fact6$name_abbr)
+#adding rows of regional levels
+df <- bind_rows(df, tibble(group = rep("World", length(region_colors$Region[c(1, 3, 5, 7, 9,11, 13)])),
+                           subgroup = region_colors$Region[c(1, 3, 5, 7, 9, 11, 13)]))
+
+df <- as.data.frame(table(df))
+df <- filter(df, Freq > 0)
+
+#the size of circle should be stored in the vertices object
+vertices <- df |>
+  dplyr::distinct(subgroup, Freq) |>
+  dplyr::add_row(subgroup = "World", Freq = 0)|> 
+  left_join(fact6 |> select(name_abbr, ref.0to17.estimate, Region), by=c("subgroup" = "name_abbr"))
+
+vertices$ref.0to17.estimate[is.na(vertices$ref.0to17.estimate)] <- 0  #fill NA values of regions
+
+#region category names for special coloring
+vertices$Region[vertices$subgroup=="Sub-Saharan Africa"] <- "XSub-Saharan Africa"
+vertices$Region[vertices$subgroup=="Northern Africa and Western Asia"] <- "XNorthern Africa and Western Asia"
+vertices$Region[vertices$subgroup=="Central and Southern Asia"] <- "XCentral and Southern Asia"
+vertices$Region[vertices$subgroup=="Eastern and South-Eastern Asia"] <- "XEastern and South-Eastern Asia"
+vertices$Region[vertices$subgroup=="Europe and Northern America"] <- "XEurope and Northern America"
+vertices$Region[vertices$subgroup=="Latin America and the Caribbean"] <- "XLatin America and the Caribbean"
+vertices$Region[vertices$subgroup=="Oceania"] <- "XOceania"
+vertices$Region[vertices$subgroup=="World"] <- "World"
+
+#selecting which countries to show label
+min.pop.label <- 150000
+vertices$name_label <- NA
+vertices$name_label[!is.na(vertices$ref.0to17.estimate) & vertices$ref.0to17.estimate>min.pop.label] <- vertices$subgroup[!is.na(vertices$ref.0to17.estimate) & vertices$ref.0to17.estimate>min.pop.label]
+vertices$name_label[vertices$name_label == "Democratic Republic of the Congo"] <- "DRC"
+vertices$name_label[vertices$name_label == "Iran (Islamic Republic of)"] <- "Iran (Islamic\nRepublic of)"
+vertices$name_label[vertices$name_label == "United Kingdom"] <- "United\nKingdom"
+vertices$name_label[vertices$name_label == "South Sudan"] <- "South\nSudan"
+# vertices$name_label[vertices$name_label == "Syrian Arab Republic"] <- "Syrian\nArab\nRep."
+
+#region labels
+vertices$region_label <- NA
+vertices$region_label[vertices$ref.0to17.estimate == 0] <- vertices$subgroup[vertices$ref.0to17.estimate == 0]
+vertices$region_label[vertices$region_label == "World"] <- NA
+vertices$ref.0to17.estimate[vertices$ref.0to17.estimate == 0] <- 10000 #regional numbers must not be 0. Strange that this is not a problem for asylum
+
+graph <- graph_from_data_frame(df, vertices = vertices)
+
+ggraph(graph, layout = "circlepack", weight = ref.0to17.estimate) +
+  geom_node_circle(aes(fill = Region, colour = as.factor(depth), group = depth), 
+                   linewidth = 0.01) + #width of circle line
+  scale_fill_manual(values = my_colors2, 
+                    breaks = region_colors$Region[c(1,3,5,7,9,11,13)]) + #adding breaks so the legend only shows the color of the country circles and not the lighter region circles
+  coord_fixed() +
+  geom_node_text(aes(label = name_label), color = "black", repel = FALSE, size = 1.5, show.legend = F) +
+  #geom_node_label(aes(label = region_label), color = "black", repel = TRUE, size = 2, show.legend = F) +
+  scale_color_manual(values = c("0" = "white", "1" = "darkgrey", "2" = "darkgrey" ) ) +
+  theme_void()+
+  guides(colour="none")+
+  theme(legend.title = element_blank(),
+        legend.text = element_text(size = 3),
+        legend.key.size = unit(0.3, "cm"))
+ggsave(file.path(projectFolder, "fact6_asylum.pdf"), width = 8, height = 5, units = "cm")
+
+## fact6.xls ----
+fact6.xls <- fact6 |>
+  mutate(OBS_VALUE = round(ref.0to17.estimate)) |> 
+  select(name, Region, OBS_VALUE)
+
+# FACT 3: MAP IMS ----
+data3 <- mig.stock.0to17 |> filter(year == 2020, sex == "both") #This results in one value per iso3
+
+#preparing circles layer
+#this is a little tricky... The ID of the polygons of world.robin are the territory names, not iso3
+#This means that some values of iso3 are duplicated. For example: PRT (Portugal and Azores), PSE (West Bank, Gaza)
+#This means that we need to choose which polygon to use for each iso3
+#to avoid removing polygons that are in the mig.stock data, we first add the migstock values to the table and then check for duplicates, 
+world.robin@data <- world.robin@data |> left_join(data3 |> select(iso3, pop.mig.0to17), by=c("ISO3_CODE"="iso3"))
+
+data3$iso3[!data3$iso3 %in% world.robin$ISO3_CODE]
+
+#mig.stock values for "CHI" (Channel islands) "BLM" (Saint Barthélemy) "MAF" (Saint Martin (French part)) are not joined because these iso3 codes are not in world.robin
+# We will plot CHI in Jersey
+#BLM and MAF do not have miigration population
+world.robin$pop.mig.0to17[world.robin$TERR_NAME == "Jersey"] <- data3$pop.mig.0to17[data3$area == "Channel Islands"]
+
+#removing rows without values
+world.robin.with.pop.mig.data <- world.robin[!is.na(world.robin$pop.mig.0to17),]
+
+#removing duplicates (some territories have the same iso3, so they have duplicated mig data)
+#manually choosing which to eliminate because it is complicated to make some rules to eliminate
+#
+world.robin.with.pop.mig.data <- world.robin.with.pop.mig.data[world.robin.with.pop.mig.data$pop.mig.0to17 > 0, ] 
+world.robin.with.pop.mig.data <- world.robin.with.pop.mig.data[!world.robin.with.pop.mig.data$TERR_NAME %in% 
+                                                                 c("Guernsey",
+                                                                   "Kuril islands",
+                                                                   "Senkaku Islands",
+                                                                   "Madeira Islands",
+                                                                   "Azores Islands",
+                                                                   "West Bank" #Althoug mig population is probably larger in WB, migstock for PSE is plotted in in Gaza because there are two WB polygons and it is easier to eliminate these.  
+                                                                 ),] 
+world.robin.with.pop.mig.data <- world.robin.with.pop.mig.data[!world.robin.with.pop.mig.data$CAPITAL %in% 
+                                                                 c("Klien"),] 
+#to check if there are duplicated numbers, which most likely means that there are duplicated mig.stock values
+#any(duplicated(world.robin.with.pop.mig.data$pop.mig.0to17))
+
+#preparing table with centroids and data
+pop.mig.in.centroids <- coordinates(world.robin.with.pop.mig.data) 
+pop.mig.in.centroids <- tibble(x=pop.mig.in.centroids[,1], y=pop.mig.in.centroids[,2], pop.mig.0to17 = world.robin.with.pop.mig.data$pop.mig.0to17)
+
+# map function
+unpd.map <- function(){
+  plot(world.robin, border = NA,col = world.robin$color, bg = background.color) # plot country/area polygons
+  #points(x=fact7_8$long, y=fact7_8$lat) #to double check that points are inside plotting area
+  polygon(acf$long, acf$lat,col = acf$color[1], border = NA, density = 130, angle = 45, lwd = 0.4) # plot Aksai Chin as striped region per UN Cartography requirements
+  
+  lines(bnd.line, col = boundary.color, lwd = 0.2, lty = 1) # plot solid boundaries
+  lines(bnd.dash, col = boundary.color, lwd = 0.2, lty = 2) # plot dashed boundaries
+  lines(bnd.dot, col = boundary.color, lwd = 0.2, lty = 3) # plot dotted boundaries
+  lines(bnd.ssd, col = boundary.color, lwd = 0.2, lty = 2) # plot SSD-SDN boundary
+  
+  lks.grp <- unique(lks.df$group)
+  for (gp in lks.grp) {
+    lk <- lks.df[lks.df$group == gp,]
+    polygon(lk$long, lk$lat, col = background.color, border = NA, lty = 1, lwd = 0.2) # plot lakes as background color
+  }
+  
+  #if (plot.coastlines==TRUE) {
+  #lines(cst, col=coastline.color, lwd=0.2, lty=1) # plot coastlines as solid lines
+  #}
+  
+  for (i in 1:nrow(pop.mig.in.centroids))
+  {
+    draw.circle(x = pop.mig.in.centroids$x[i], 
+                y = pop.mig.in.centroids$y[i],
+                radius = 0.3 * pop.mig.in.centroids$pop.mig.0to17[i], 
+                border = "#52525290", col = "#52525280")}
+}
+
+#unpd.map() #to plot to Rstudio
+
+#png(file = "output/fact3.png", width = 8, height = 4, units = "in", res = 200)
+pdf(file = "output/fact3.pdf", width = 8, height = 4)
+par(mfrow = c(1,1), omi = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), mgp = c(2, 0.5, 0), 
+    las = 0, mex = 1, cex = 1, cex.main = 1, cex.lab = 1, cex.axis = 1)
+unpd.map()
+dev.off() # close the pdf
+
+## fact3.xls ----
+fact3.xls <- data3 |>
+  mutate(OBS_VALUE = round(pop.mig.0to17.eu)) |> 
+  select(area, OBS_VALUE)
+
+# FACT 7 and 8 : MAP IDP and IDP NEW----
+## Fact 7 summary----
+fact7.idmc.stock <- idmc.stock |>
+  filter(year == 2024) |> 
+  filter(sex == "Both sexes") |> 
+  left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code")
+
+idmc.stock.summary <-  fact7.idmc.stock |> 
+  group_by(cause, year)|> 
+  summarise(pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop') |> 
+  mutate(perc = round(100 * pop.0to17 / sum(pop.0to17), digits = 1),
+         pop.0to17.millions = round(pop.0to17 / 1000000, digits = 1))
+View(idmc.stock.summary)
+
+idmc.stock.summary <-  fact7.idmc.stock |> 
+  group_by(cause, year)|> 
+  summarise(pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop')
+
+idmc.stock.summary.region <-  fact7.idmc.stock |> 
+  filter(cause == "Conflict") |> 
+  group_by(Region)|> 
+  summarise(pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop') |> 
+  mutate(perc = round(100 * pop.0to17 / sum(pop.0to17), digits = 1),
+         pop.0to17.millions = round(pop.0to17 / 1000000, digits = 1))
+View(idmc.stock.summary.region)
+
+idmc.stock.2024 <-  idmc.stock |> 
+  filter(year == 2024, sex == "Both sexes") |> 
+  summarise(pop = sum(idp.stock, na.rm = T),
+            pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop') |> 
+  mutate(perc = round(100 * pop.0to17 / pop, digits = 1))
+idmc.stock.2024
+
+## Fact 8 summary----
+fact8.idmc.new <- idmc.new |> 
+  filter(year == 2024) |> 
+  left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") 
+
+idmc.new.summary <- fact8.idmc.new |> 
+  group_by(cause) |> 
+  summarise(idp.new.0to17 = sum(idp.new.0to17, na.rm = T), .groups = 'drop') |> 
+  mutate(idp.new.0to17.millions = round(idp.new.0to17 / 1000000, digits = 1))
+View(idmc.new.summary)
+
+idmc.new.summary.region.conf <- fact8.idmc.new|> 
+  filter(cause == "Conflict") |> 
+  group_by(Region)|> 
+  summarise(idp.new.0to17 = sum(idp.new.0to17, na.rm = T), .groups = 'drop') |> 
+  mutate(idp.new.0to17.millions = round(idp.new.0to17 / 1000000, digits = 1))
+View(idmc.new.summary.region.conf)
+
+idmc.new.summary.region.dis <- fact8.idmc.new|> 
+  filter(cause == "Disaster") |> 
+  group_by(Region)|> 
+  summarise(idp.new.0to17 = sum(idp.new.0to17, na.rm = T),
+            .groups = 'drop') |> 
+  mutate(idp.new.0to17.millions = round(idp.new.0to17 / 1000000, digits = 1))
+View(idmc.new.summary.region.dis)
+
+## Fact Weather vs Conflict----
+conflict.2016.2024 <- idmc.new |> 
+  filter(year >= 2016, cause == "Conflict") |>
+  group_by(year) |> 
+  summarise(idp.new.0to17 = sum(idp.new.0to17, na.rm = T)) |> 
+  mutate(cause = "Conflict and violence")
+
+weather.2016.2024 <- idmc.new.disaster.events |> 
+  filter(year >= 2016, hazard.cat == "Weather related") |>
+  group_by(year) |> 
+  summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T)) |> 
+  mutate(cause = "Weather")
+
+new.disp.conf.weat <- bind_rows(conflict.2016.2024, weather.2016.2024) |> 
+  mutate(idp.new.0to17 = idp.new.0to17 / 1000000)
+
+View(new.disp.conf.weat |> group_by(cause) |> summarise(idp.new.0to17 = sum(idp.new.0to17)) |> mutate(idp.new.0to17.mill = round(idp.new.0to17)))
+
+g <- ggplot(new.disp.conf.weat, aes(x = factor(year), y = idp.new.0to17, fill = cause, group = cause)) + 
+  geom_bar(stat = "identity", position = "dodge") + 
+  xlab("Year") + ylab("New internal displacements (in millions)") +
+  theme_classic() +
+  theme(axis.line = element_line(colour = "grey50", linewidth = 0.4),
+        axis.text = element_text(size = 8, color = "grey50"), 
+        axis.ticks = element_line(colour = "grey50", linewidth = 0.4), 
+        axis.title = element_text(size = 8, color = "grey50"),
+        legend.position="bottom", 
+        legend.title=element_blank())
+print(g)
+
+## Fact Weather ----
+weather.2016.2024.region <- idmc.new.disaster.events |> 
+  filter(year >= 2016, hazard.cat == "Weather related") |>
+  left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
+  group_by(Region) |> 
+  summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T)) 
+
+drought.2016.2024.region <- idmc.new.disaster.events |> 
+  filter(year >= 2016, hazard.type == "Drought") |>
+  left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
+  group_by(Region) |> 
+  summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T), .groups = "drop") |> 
+  mutate(perc = round(100 * idp.new.0to17 / sum(idp.new.0to17)))
+
+storm.2016.2024.region <- idmc.new.disaster.events |> 
+  filter(year >= 2016, hazard.type == "Storm") |>
+  left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
+  group_by(Region) |> 
+  summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T), .groups = "drop") |> 
+  mutate(perc = round(100 * idp.new.0to17 / sum(idp.new.0to17)))
 
 
-load(file.path(rawdataFolder, "UNRWA/UNRWA_older/unrwa2021.RData"))
-load(file.path(rawdataFolder, "UNHCR/GlobalTrends2020/unhcr2020.RData"))
+## Prepare IDMC data for pie charts----
+places <- data.frame(matrix(ncol = 5, nrow = length(world.robin)))
+colnames(places) <- c("ISO3Code", "TERR_NAME", "long", "lat", "STATUS")
 
-#World 2020 mid year population of children, adults and 60+
-world.pop <- wpp.age.group |> filter(area == "WORLD" & year %in% c(2020,2021)) |>
-  select( pop0to17 = pop0to17.thsd,poptotal = poptotal.thsd,pop60plus = pop60plus.thsd) |>
-  mutate(poptotal = poptotal-pop0to17-pop60plus) |> #adult population
-  mutate_all(~.*1000) |>
-  select(pop0to17,pop18to59 = poptotal,pop60plus) |>
-  sapply(mean)  #mid year. As a mean of 2020 and 2021
+places$ISO3Code <- as.character(world.robin$ISO3_CODE)
+places$TERR_NAME <- world.robin$TERR_NAME
+places$long <- coordinates(world.robin)[, 1]
+places$lat <- coordinates(world.robin)[, 2]
+places$STATUS <- world.robin$STATUS
+places$ISO3Code[places$TERR_NAME == 'Abyei'] <- 'AB9'
 
-#World 2020 migrant population of children, adults and 60+. This includes refugees
-mig.pop <- cbind(mig.stock.orig.dest |> filter(year == 2020 & dest.area == "WORLD") |> distinct(pop.mig.total), age0to17 = mig.stock.0to17.wld |> filter(year == 2020) |> pull(pop.mig.0to17), mig.stock.age |> filter(year == 2020 & area == "WORLD" & sex =="both" & age.group %in% c("60to64","65to69","70to74","75plus")) |>
-                   summarise(age60plus = sum(pop.mig))) |>
-  mutate(pop.mig.total = pop.mig.total-age0to17-age60plus) |>
-  select(pop0to17 = age0to17,pop18to59 = pop.mig.total,pop60plus = age60plus)
+fact7 <- fact7.idmc.stock |>  
+  select(ISO3Code, cause, idp.stock.0to17) |> 
+  pivot_wider(names_from = cause, values_from = idp.stock.0to17) |> 
+  mutate(Disaster.stock = ifelse(is.na(Disaster), 0, Disaster),
+         Conflict.stock = ifelse(is.na(Conflict), 0, Conflict))  |> 
+  left_join(places, by = "ISO3Code") |> 
+  filter(STATUS != 'PT Territory', !(TERR_NAME %in% c('Guernsey','Senkaku Islands','Gaza Strip','Kuril islands')) )|> 
+  mutate(fact7 = Conflict.stock + Disaster.stock) |> 
+  mutate(fact8_color = fact7 > 0)
 
-#World 2020 UNHCR refugee population of children, adults and 60+. Reminder: this numbers do NOT include UNRWA refugees
-ref.pop <- unhcr.gt.tab11 |> #From UNHCR 2020 data
-  filter(area.id < 900 & pop.type == "Refugees") |> 
-  filter(coverage.sex.age.asy >= 0.5) |> 
-  summarise(sum1 = sum(pop.ref.0to17.fem.asy) + sum(pop.ref.0to17.male.asy),
-            sum2 = sum(pop.ref.18to59.fem.asy)+sum(pop.ref.18to59.male.asy),
-            sum3 = sum(pop.ref.60plus.fem.asy)+sum(pop.ref.60plus.male.asy)) |>
-  mutate(pop0to17 = 20650315*sum1/(sum1+sum2+sum3),
-         pop18to59 =20650315* sum2/(sum1+sum2+sum3),
-         pop60plus = 20650315*sum3/(sum1+sum2+sum3)) |>  #20650315 is #world refugee 2020
-  select(pop0to17, pop18to59 , pop60plus)
-
-#World 2020 UNRWA refugee population of children, adults and 60+. Excluding in Palestine
-ref.unrwa.pop.exclpse <- df.unrwa.all.2021 |> 
-  filter(year == 2020, !name %in% c("total","Gaza Strip","West Bank"), age != "all") |>  
-  group_by(age) |>
-  summarise(sum(pop)) |> 
-  mutate(age = c("pop0to17", "pop18to59","pop60plus")) |> 
-  spread(key = 1, value = 2)
-
-#Adding UNRWA (w/o PSE) to UNHCR refugee. 
-ref.pop.all <- ref.pop + ref.unrwa.pop.exclpse
-
-#merging and arranging all tables
-fig6<- as.data.frame(rbind(world.pop,mig.pop,ref.pop.all)) |>
-  cbind(measure=c("World population","UNPD International\nMigrant Stock","Refugees\n(UNHCR, UNRWA)"))|>
-  gather("age","pop",-measure) |>
-  group_by(measure) |>
-  mutate(pct = pop/sum(pop)) |>
-  arrange(measure) |>
-  mutate(pct.pos = cumsum(pct)-pct/2)
-
-fact8 <- ggplot(data = fig6,mapping = aes(x = measure, y = pct, fill = age))+
-  geom_bar(stat = "identity", position = position_stack(reverse = TRUE), width = 0.5)+
-  scale_y_continuous(labels = scales::percent)+
-  geom_text(aes(label = paste0(100*round(pct,2),"%"),y=pct.pos),size = 3, color="white", fontface = "bold")+
-  ylab("percent")+
-  scale_fill_manual(name = "Age Composition", labels = c("0 to 17", "18 to 59", "60+"), values =  c("#5EBB48","#0092C4","#774C9E"))+
-  scale_x_discrete(limits=c("World population","UNPD International\nMigrant Stock","Refugees\n(UNHCR, UNRWA)"))+
-  coord_flip()+
-  theme(axis.line=element_blank(),
-        axis.text.x=element_blank(),axis.ticks=element_blank(),
-        legend.position = "bottom",
-        legend.title = element_blank(),
-        axis.title.y=element_blank(),
-        axis.title.x=element_blank(),
-        panel.background=element_blank(),panel.border=element_blank(),panel.grid.major=element_blank(),
-        panel.grid.minor=element_blank(),plot.background=element_blank(),aspect.ratio = 0.4)
-fact8
-ggsave("output/fact8.pdf", device = "pdf")
+fact8 <- fact8.idmc.new |>  
+  select(ISO3Code, cause, idp.new.0to17) |> 
+  pivot_wider(names_from = cause, values_from = idp.new.0to17) |> 
+  mutate(Disaster.new = ifelse(is.na(Disaster), 0, Disaster),
+         Conflict.new = ifelse(is.na(Conflict), 0, Conflict))  |> 
+  left_join(places, by = "ISO3Code") |> 
+  filter(STATUS != 'PT Territory', !(TERR_NAME %in% c('Guernsey','Senkaku Islands','Gaza Strip','Kuril islands')) )|> 
+  mutate(fact8 = Conflict.new + Disaster.new) |> 
+  mutate(fact8_color = fact8 > 0)
 
 
-# FACT X: Share of refugees among migrants ----
-#We also calculate the share of 0-17 refugees among 0-17 migranbts
-mig.stock.0to17 <- mig.stock.0to17 |> mutate(pop.mig.0to17 = pop.mig.0to17.eu)
+#add column to specify if polygons are present in the data, to color them differently
+world.robin$fact7_color <- world.robin$ISO3_CODE %in% (fact7 |> filter(fact7_color) |> pull(ISO3Code))
+world.robin$fact7_color[world.robin$TERR_NAME == "Taiwan province of China"] <- world.robin$fact7_color[world.robin$TERR_NAME == "China"]   #color Taiwan the same as China
+world.robin$fact7_color[world.robin$TERR_NAME == "Aksai Chin"] <- TRUE #China and India are colored, so no need for stripes
+world.robin$fact7_color[world.robin$TERR_NAME == "Arunachal Pradesh"] <- world.robin$fact7_color[world.robin$TERR_NAME == "India"] #Same color as India
+world.robin$fact7_color[world.robin$TERR_NAME == "Jammu and Kashmir"] <- TRUE # #Pakistan and India are colored, so no need for stripes
 
-#UNPD note
-# The column labelled “Type of data” indicates the type of data used in deriving the estimates presented. The codes used are: B, which indicates that estimates were derived from data on the foreign-born population; C, which indicates that estimates were derived from data on foreign citizens; R, which indicates that the number of refugees or persons in refugee-like situations, asylum seekers or Venezuelans displaced abroad as reported by the Office of the United Nations High Commissioner for Refugees (UNHCR) or, where appropriate, the United Nations Relief and Works Agency for Palestine Refugees in the Near East (UNRWA) were added to the estimates, and I, which indicates that there were no data on international migrants for the country or area concerned and that the estimates presented were imputed.
+world.robin$fact8_color <- world.robin$ISO3_CODE %in% (fact8 |> filter(fact8_color) |> pull(ISO3Code))
+world.robin$fact8_color[world.robin$TERR_NAME == "Taiwan province of China"] <- world.robin$fact8_color[world.robin$TERR_NAME == "China"]   #color Taiwan the same as China
+world.robin$fact8_color[world.robin$TERR_NAME == "Aksai Chin"] <- TRUE #China and India are colored, so no need for stripes
+world.robin$fact8_color[world.robin$TERR_NAME == "Arunachal Pradesh"] <- world.robin$fact8_color[world.robin$TERR_NAME == "India"] #Same color as India
+world.robin$fact8_color[world.robin$TERR_NAME == "Jammu and Kashmir"] <- TRUE # #Pakistan and India are colored, so no need for stripes
 
-#share of refugees among migrants as reported by UNPD
+make.world.map <- function(ind0){
+  library(mapplots) # No used functions found
+  library(reshape2) # No used functions found
+  
+  #color countries only if they have data
+  world.robin$colorcode <- NA
+  # UN Cartography requires that the Askai Chin region be striped half in the color of China and half in the color of
+  # Jammu-Kashmir (no data for most of UNPD purposes)
+  # to do that, we create a separate polygon file that contains only the single region Aksai Chin and assign it the color of China for now
+  # it will be layered on top of the map in a separate step
+  #ac <- world.robin[world.robin$TERR_NAME=="Aksai Chin",]
+  #acf <- fortify(ac) # transform to data frame for more plotting options
+  #acf$colorcode <- world.robin$colorcode[which(world.robin$TERR_NAME=="China")]
+  
+  # three styles of boundaries should be mapped: standard solid line, dashed line for undetermined boundaries, dotted for selected disputed boundaries
+  # to do that, we create a separate dataframe with each containing boundaries of the same type
+  bnd.line <- bnd[bnd$CARTOGRAPH == "International boundary line",]
+  bnd.dash <- bnd[bnd$CARTOGRAPH == "Dashed boundary line" | bnd$CARTOGRAPH == "Undetermined international dashed boundary line",]
+  bnd.dot <- bnd[bnd$CARTOGRAPH == "Dotted boundary line" | bnd$CARTOGRAPH == "Dotted boundary line (Abyei)",]
+  bnd.ssd <- bnd[bnd$BDY_CNT01 == "SDN" & bnd$BDY_CNT02 == "SSD",] # Specify SSD-SDN boundaries and plot later to resolve issue of not showing in the original script 
+  
+  #data of the indicator
+  #ind0 <- 'fact7'
+  if(ind0 == "fact7"){
+    filter_column <- "fact7_color"
+    spec.nms <- c("Conflict.stock", "Disaster.stock")
+    
+    radii_multiply <- 0.003
+    world.robin$colorcode[world.robin$fact7_color] <- "#d3f5ef"
+    world.robin$colorcode[!world.robin$fact7_color] <- "grey97"
+    fact7_8 <-  fact6 |> filter(get(filter_column)) #filtering only data for chosen indicator
+    
+    #scale legend specs
+    legend.scales <- tibble(scale = c(250000, 500000, 1000000, 2000000),
+                            long = rep(x = -12000000, times = 4),
+                            lat = seq(from = -4000000, to = -2000000, length.out = 4),
+                            scale.label = c("250 K", "500 K", "1 M", "2 M"))
+  } else {
+    filter_column <- "fact8_color"
+    spec.nms <- c("Conflict.new", "Disaster.new")
+    radii_multiply <- 0.003
+    world.robin$colorcode[world.robin$fact8_color] <- "#d3f5ef"
+    world.robin$colorcode[!world.robin$fact8_color] <- "grey97"
+    
+    fact7_8 <-  fact8 |> filter(get(filter_column)) #filtering only data for chosen indicator
+    
+    #scale legend specs
+    legend.scales <- tibble(scale = c(250000, 500000, 1000000, 2000000),
+                            long = rep(x = -12000000, times=4),
+                            lat = seq(from = -4000000, to = -2000000, length.out = 4),
+                            scale.label=c("250 K", "500 K", "1 M", "2 M"))
+  }
+  
+  #Pie specs Data
+  color.table <- c(adjustcolor("#ED7D30", alpha.f = 0.7), adjustcolor("#774C9E", alpha.f = 0.7))
+  names(color.table) <- spec.nms
+  pie.list <- lapply(1:nrow(fact7_8),
+                     function(i) as.table(nv(as.vector(as.matrix(fact7_8[i,spec.nms])),spec.nms))) #list of vectors with datas
+  
+  #Pie specs legend
+  pie.list.legend <- lapply(1:nrow(legend.scales),
+                            function(i) as.table(nv(as.vector(as.matrix(legend.scales[i,"scale"])),"scale"))) #list of vectors with datas
+  color.table.legend <- c(adjustcolor("#808080", alpha.f = 0.7))
+  names(color.table.legend) <- "scale"
+  
+  
+  # write the map function
+  unpd.map <- function(){
+    plot(world.robin,border =NA, col=world.robin$colorcode, bg = background.color) # plot country/area polygons
+    #points(x=fact7_8$long, y=fact7_8$lat) #to double check that points are inside plotting area
+    #polygon(acf$long,acf$lat,col=acf$colorcode[1],border=NA, density=130,angle=45,lwd=0.4) # plot Aksai Chin as striped region per UN Cartography requirements
+    
+    lines(bnd.line, col = boundary.color, lwd = 0.2, lty = 1) # plot solid boundaries
+    lines(bnd.dash, col = boundary.color, lwd = 0.2, lty = 2) # plot dashed boundaries
+    lines(bnd.dot, col = boundary.color, lwd = 0.2, lty = 3) # plot dotted boundaries
+    lines(bnd.ssd, col = boundary.color, lwd = 0.2, lty = 2) # plot SSD-SDN boundary
+    
+    lks.grp <- unique(lks.df$group)
+    for (gp in lks.grp) {
+      lk <- lks.df[lks.df$group == gp,]
+      polygon(lk$long,lk$lat, col = background.color, border = boundary.color, lty = 1, lwd = 0.2) # plot lakes as background color
+    }
+    
+    if (plot.coastlines == TRUE) {
+      lines(cst, col = coastline.color, lwd = 0.2, lty = 1) # plot coastlines as solid lines
+    }
+    
+    #plotting pie charts in scatterplot
+    pies_overplot(x = pie.list, x0 = fact7_8$long, y0 = fact7_8$lat, radii = sqrt(fact7_8 |> pull(ind0)) * radii_multiply,
+                  color.table = color.table, lty = 0)
+    
+    #plotting legend pie charts in scatterplot
+    pies_overplot(x = pie.list.legend, x0 = legend.scales$long, y0 = legend.scales$lat, radii = sqrt(legend.scales |> pull('scale')) * radii_multiply,
+                  color.table = color.table.legend, lty = 0)
+    
+    #Legend labels
+    text(x = legend.scales$long+1800000, y = legend.scales$lat, labels = legend.scales$scale.label, cex = 0.8, col = adjustcolor("#808080", alpha.f=0.7))
+  }
+  
+  #png(file = paste0("output/", ind0, ".png"), width = 8, height = 4, units = "in", res = 200)
+  pdf(file = file.path(projectFolder, paste0(ind0, ".pdf")), width = 8, height = 4)
+  par(mfrow = c(1,1), omi = c(0, 0, 0, 0), mar = c(0, 0, 0, 0), mgp = c(2, 0.5, 0), 
+      las = 0, mex = 1, cex = 1, cex.main = 1, cex.lab = 1, cex.axis = 1)
+  unpd.map()
+  dev.off() # close the pdf
+}
 
-unpd.refugees <- readxl::read_xlsx(file.path(path.basic,"Data/UNPD/UNMigrantStock2020/undesa_pd_2020_ims_stock_by_sex_and_destination.xlsx"),
-                                   range="Table 6!B11:S294", #Table 6: Estimated refugee stock (including asylum seekers) at mid-year by region, country or area of destination, 1990-2020
-                                   na="~") |> 
-  filter(`Location code` <900) |> 
-  select("area"="Region, development group, country or area",
-         "type.of.data"=`Type of data`,
-         "area.id"="Location code",
-         "unpd.refugees"="2020...11",
-         "unpd.refugees.perc.from.mig.stock"="2020...18") |> 
-  mutate(unpd.refugees.perc.from.mig.stock=as.numeric(unpd.refugees.perc.from.mig.stock))  #
+#run function to build maps
+make.world.map(ind0 = "fact7")
+make.world.map(ind0 = "fact8")
+
+## fact7 and fact8 xls ----
+fact7.xls <- fact7 |>
+  select(TERR_NAME, ISO3Code, Disaster, Conflict)
+
+fact8.xls <- fact8 |>
+  mutate(Disaster = round(Disaster),
+         Conflict = round(Conflict)) |> 
+  select(TERR_NAME, ISO3Code, Disaster, Conflict)
+
+# FACT 9: UASC NUMBERS ----
+#Asylum applicants considered to be unaccompanied minors by citizenship, age and sex - annual data
+migr_asyunaa <- get_eurostat("migr_asyunaa", time_format = "num", stringsAsFactors = TRUE)
+#write.table(migr_asyunaa, file = file.path(rawdataFolder, "Eurostat/migr_asyunaa.csv"), row.names = F, sep = ",")
+
+#in Europe in 2015, when around 103,000 unaccompanied minors applied for asylum in European countries  
+migr_asyunaa_annual <- migr_asyunaa |> filter(age == "TOTAL", sex == "T", geo == "EU27_2020", citizen == "TOTAL") |> group_by(TIME_PERIOD) |> summarise(values = sum(values))
+migr_asyunaa_annual_af <- migr_asyunaa |> filter(age == "TOTAL", sex == "T", geo == "EU27_2020", citizen == "AF") |> group_by(TIME_PERIOD) |> summarise(values = sum(values))
 
 
-#getting the column of type of data for UNPD migrant stock. This was not saved when producing the mig.stock.0-17
-mig.stock.0to17.countries.type.of.data <- readxl::read_xlsx(file.path(path.basic,"Data/UNPD/UNMigrantStock2020/undesa_pd_2020_ims_stock_by_age_sex_and_destination.xlsx"),
-                                                            range="Table 1!B11:F1992") |> 
-  filter(Year==2020) |> 
-  select("area.id"="Location code",
-         "type.of.data"=`Type of data`)
+# EXPORT EXCEL WITH TABLES ----
+list.of.sheets = list("fact1" = fact1.xls,
+                      "fact2" = fact2.xls,
+                      "fact3" = fact3.xls,
+                      "fact4" = fact4.xls,
+                      "fact5" = fact5.xls,
+                      "fact6" = fact6.xls,
+                      "fact7" = fact7.xls,
+                      "fact8" = fact8.xls)
+write.xlsx(list.of.sheets, file = file.path(projectFolder, "9facts_data.xlsx"))
 
-#UNPD migrant stock. Estimated from undesa_pd_2020_ims_stock_by_age_sex_and_destination.xlsx Table 1.
-#Europe countries Corrected using eurostat
-mig.stock.0to17.countries <- mig.stock.0to17 |> 
-  mutate(pop.mig.0to17 = pop.mig.0to17.eu) |>  #this is correcting the europe numebrs with eurostat data
-  filter(year==2020, sex=="both") |> 
-  left_join(mig.stock.0to17.countries.type.of.data, by="area.id")
-
-#Countries 2020 UNHCR population of children, adults and 60+. Reminder: this numbers do NOT include UNRWA refugees
-#Including Refugees, AS and VDP (after 2022 named OIP)
-unhcr.ref <- unhcr.gt.tab11 |> #From UNHCR 2020 data
-  filter(area.id < 900 & pop.type %in% c("Refugees", "Asylum-seekers", "Venezuelans displaced abroad")) |> 
-  group_by(iso3) |> 
-  summarise(area.id=unique(area.id),
-            ref.unhcr=sum(pop.ref.asy, na.rm=F),
-            ref.unhcr.0to17=sum(pop.ref.0to17.asy, na.rm=F)) 
-
-#World 2020 UNRWA refugee population of children and total. Excluding in Palestine
-unrwa.ref <- df.unrwa.all.2021 |> 
-  filter(year == 2020, iso3 %in% c("JOR","LBN","SYR")) |>  #removing PSE and summaries
-  group_by(iso3) |> 
-  summarise(ref.unrwa=sum(pop[age=="all"]),
-            ref.unrwa.0to17=sum(pop[age=="0to17"]))
-
-unhcrunrwa.ref <- unhcr.ref |> left_join(unrwa.ref, by="iso3") |> 
-  rowwise() |> 
-  mutate(unhcrunrwa.ref=sum(ref.unhcr, ref.unrwa, na.rm=T), #na.rm=T because all countries have unhcr or unrwa counts
-         unhcrunrwa.ref.0to17=sum(ref.unhcr.0to17, ref.unrwa.0to17, na.rm=F))  #na.rm=F because we can"t count children in countries with NA values
-
-
-#compare refugee numbers from UNPD and UNHCR+UNRWA
-#UNPD (2020 mid-year) has 500k less REF+AS+VDA accounted than the numbers from UNHCR and UNRWA (2020 end-year)
-
-unpd.refugees.compare <- unpd.refugees |>
-  filter(grepl("R", type.of.data)) |>   #only compare those with UNPD type of data R
-  left_join(unhcrunrwa.ref |> select(area.id, unhcrunrwa.ref), by="area.id") |> 
-  mutate(difference.from.unhcrunrwa=unpd.refugees - unhcrunrwa.ref ,
-         difference.from.unhcrunrwa.perc=(100*(difference.from.unhcrunrwa)/unhcrunrwa.ref))
-plot(unpd.refugees.compare$unpd.refugees,unpd.refugees.compare$unhcrunrwa.ref)
-
-#what is the difference? UNPD has 483817 less ref+AS+VDA reported than UNHCR+UNRWA in 2020
-sum(unpd.refugees.compare$difference.from.unhcrunrwa, na.rm=T)
-
-#ARE THERE ANY UNPD COUNTIES WITHOUT AN R THAT HAVE SIGNIFICANT UNHCR OR UNRWA POPULATIONS?
-
-#SHARE OF REFUGEES (UNPD OR UNHCR+UNRWA) AMONG UNPD MIGRANT STOCK
-share.refugees <- unpd.refugees.compare  |> 
-  left_join(mig.stock.0to17.countries |> select(area.id, pop.mig.total, pop.mig.0to17), by="area.id") |> 
-  mutate(share.refugees.unpd=round(100*unpd.refugees/pop.mig.total),
-         share.refugees.unhcrunrwa=round(100*unhcrunrwa.ref/pop.mig.total),
-         difference.from.unhcrunrwa.share=share.refugees.unpd-share.refugees.unhcrunrwa)
-
-big.dif.abs <- share.refugees |> 
-  mutate(difference.from.unhcrunrwa.abs=abs(difference.from.unhcrunrwa)) |> 
-  arrange(desc(difference.from.unhcrunrwa.abs)) |>
-  head(n=10) |> 
-  select(area, unpd.refugees, unhcrunrwa.ref, difference.from.unhcrunrwa, share.refugees.unpd, share.refugees.unhcrunrwa)
-
-big.dif.share<- share.refugees |> 
-  mutate(difference.from.unhcrunrwa.share.abs=abs(difference.from.unhcrunrwa.share)) |> 
-  arrange(desc(difference.from.unhcrunrwa.share.abs)) |>
-  head(n=10) |> 
-  select(area, unpd.refugees, unhcrunrwa.ref, share.refugees.unpd, share.refugees.unhcrunrwa,difference.from.unhcrunrwa.share)
-
-
-plot(share.refugees$share.refugees.unpd,share.refugees$share.refugees.unhcrunrwa)
-
-
+list.of.sheets = list("fact1" = fact4.xls,
+                      "fact2" = fact5.xls,
+                      "fact3" = fact6.xls,
+                      "fact4" = fact7.xls,
+                      "fact5" = fact8.xls,
+                      "fact6" = new.disp.conf.weat)
+write.xlsx(list.of.sheets, file = file.path(projectFolder, "key_facts_data.xlsx"))

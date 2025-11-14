@@ -12,7 +12,7 @@ USER        <- Sys.getenv("USER")
 #file paths for each user of the repository
 if (USERNAME == "palma"){
   projectFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/IDAC/UASC InSight/output")) #Output files
-  repoFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "code/Dem-Analytics/07_IDAC_InSight_UASC_2025/")) #repository files
+  repoFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "code/IDAC/04_InSight_UASC_2025/")) #repository files
   rawdataFolder <- file.path(file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/Migration and Displacement/Data/"))  #raw data folder
 } 
 
@@ -157,7 +157,8 @@ print(paste0("Male among UASC: ", round(100*uk_UASC_applications_male/uk_UASC_ap
 EU.as <- migr_asyappctza |> filter(TIME_PERIOD >=2014, TIME_PERIOD <=2024, citizen == "TOTAL", geo %in% EU27, age=="TOTAL", sex=="T", asyl_app =="ASY_APP") |> pull(values) |> sum()
 EU.as.children <- migr_asyappctza |> filter(TIME_PERIOD >=2014, TIME_PERIOD <=2024, citizen == "TOTAL", geo %in% EU27, age=="Y_LT18", sex=="T", asyl_app =="ASY_APP") |> pull(values) |> sum()
 EU.as.UASC <- migr_asyunaa |> filter(TIME_PERIOD >=2014, TIME_PERIOD <=2024, citizen == "TOTAL", geo %in% EU27, age=="TOTAL", sex=="T") |> pull(values) |> sum()
-  
+EU.as.UASC.annual <- migr_asyunaa |> filter(citizen == "TOTAL", geo %in% EU27, sex=="T") |> group_by(TIME_PERIOD, age) |> summarise(values = sum(values))
+
 print(paste0("Total asylum applicants in the EU between 2014 and 2024: ", addUnits(EU.as) ))
 print(paste0("Children asylum applicants in the EU between 2014 and 2024: ", addUnits(EU.as.children) ))
 print(paste0("UASC asylum applicants in the EU between 2014 and 2024: ", addUnits(EU.as.UASC) ))
@@ -165,12 +166,16 @@ print(paste0("UASC asylum applicants among all applicants: ", round(100*EU.as.UA
 print(paste0("UASC asylum applicants among children: ", round(100*EU.as.UASC/EU.as.children), "%. 1 in ", round(1/(EU.as.UASC/EU.as.children))))
 
 ## USA ----
-encounters <-  sum(sbo_21_24$Encounter.Count) 
-encounters.UASC <-  sbo_21_24 |> filter(Demographic == "UC / Single Minors" ) |> pull(Encounter.Count) |> sum()
-print(paste0("Total encounters 2021 and 2024 Fiscal years: ", addUnits(encounters) ))
-print(paste0("UASC encounters 2021 and 2024 Fiscal years: ", addUnits(encounters.UASC) ))
+encounters <-  sum(sbo_19_24$Encounter.Count) 
+encounters.UASC <-  sbo_19_24 |> filter(Demographic == "UC / Single Minors" ) |> pull(Encounter.Count) |> sum()
+print(paste0("Total encounters 2019 and 2024 Fiscal years: ", addUnits(encounters) ))
+print(paste0("UASC encounters 2019 and 2024 Fiscal years: ", addUnits(encounters.UASC) ))
 print(paste0("UASC encounters among total: ", round(100*encounters.UASC/encounters), "%. 1 in ", round(1/(encounters.UASC/encounters))))
 
+annual_summary <- sbo_19_24 |> 
+  filter(Demographic == "UC / Single Minors" ) |>
+  group_by(Fiscal.Year) |> 
+  summarise(Encounter.Count = sum(Encounter.Count))
 
 ## Mexico----
 mex.total <- mex.totalevents |> pull(events) |> sum()
@@ -370,7 +375,7 @@ p <- p0 + geom_text(
     # set label locations to centers, set labels to strings
     aes(x = m.x, y = m.y, label = string)
   ) +
-  labs(title = "European Union", subtitle = "Asylum applications", caption = "Source: Eurostat, 2025.\n(online codes: migr_asyunaa and migr_asyappctza)")
+  labs(title = "European Union", subtitle = "Asylum applications", caption = "Source: Eurostat.\n(online codes: migr_asyunaa and migr_asyappctza)")
   
 
 print(paste0("EU, Total UASC 2014-2024: ", sum(q5.eu$values)))
@@ -420,7 +425,7 @@ p2 <- p2_0 + geom_text(
       mutate(string = perc_label),
     # set label locations to centers, set labels to strings
     aes(x = m.x, y = m.y, label = string))+
-  labs(title = "Mexico", subtitle = "Encounters in an irregular situation", caption = "Source: Secretaria de Gobernacion, 2025")
+  labs(title = "Mexico", subtitle = "Encounters in an irregular situation", caption = "Source: Secretaria de Gobernacion")
 
 print(paste0("Mex, Total UASC in 2014-2024: ", sum(q5.mex$values)))
 
@@ -459,9 +464,14 @@ g <- ggplot(ukr, aes(x = country, y = share)) +
         panel.grid.major.x = element_blank())
 
 print(g)
+ggsave(file.path(projectFolder, "FigDataInsight2 .pdf"), width = 25, height = 18, units = 'cm')
 
 
 # Box Ukraine  ----
+migr_asytpsm$region <- NA
+migr_asytpsm$region[migr_asytpsm$geo %in% c("IS", "NO", "LI", "CH")] <- "EFTA"
+migr_asytpsm$region[migr_asytpsm$geo %in% eu_countries$code] <- "EU27_2020"
+
 # Beneficiaries of temporary protection at the end of the month by citizenship, age and sex - monthly data
 ukr_beneficiaries_2024_june <- migr_asytpsm |> 
   filter(age %in% c("Y_LT18"),
@@ -469,10 +479,19 @@ ukr_beneficiaries_2024_june <- migr_asytpsm |>
          citizen == "UA",
          TIME_PERIOD > 2024.4,
          TIME_PERIOD < 2024.45)
-ukr_beneficiaries_2024_june$geo[ukr_beneficiaries_2024_june$geo %in% c("IS", "NO", "LI", "CH")] <- "EFTA"
-ukr_beneficiaries_2024_june$geo[!(ukr_beneficiaries_2024_june$geo == "EFTA")] <- "EU27_2020"
+
 ukr_beneficiaries_2024_june_sum <- ukr_beneficiaries_2024_june |> 
-  group_by(geo, age) |> 
+  group_by(region, age) |> 
+  summarise(values = sum(values), .groups='drop')
+
+#Total in temporary protection by age and region  in June 2025
+ukr_beneficiaries_by_age_inJune2025 <- migr_asytpsm |> 
+  filter(!is.na(region),
+         sex ==  "T",
+         citizen == "UA",
+         TIME_PERIOD > 2025.4,
+         TIME_PERIOD < 2025.45) |> 
+  group_by(region, age) |> 
   summarise(values = sum(values), .groups='drop')
 
 #	Decisions granting temporary protection by citizenship, age and sex - quarterly data
@@ -490,18 +509,18 @@ ukr_decisions_summayr <- ukr_decisions |>
 
 #18 EU countries + EFTA (Switzerland + Iceland, Malta, Norway, Liechtenstein)
 
-temp_prot_UKR_UASC <- migr_asyumtpfa |> 
+temp_prot_UKR_UASC <- migr_asytpfa |> 
   filter(citizen == "UA", sex=="T", age %in% c("Y14-17", "Y_LT14")) |> 
-  group_by(age) |> 
+  group_by(age, geo) |> 
   summarise(values = sum(values), .groups = 'drop')
 
 #	Decisions granting temporary protection by citizenship, age and sex - annual aggregated data
 temp_prot_UKR <- migr_asytpfa |> 
-  filter(age %in% c("Y14-17", "Y_LT14"), citizen == "UA", sex=="T", TIME_PERIOD %in% c(2022, 2023), geo %in% temp_prot_UKR_UASC_countries) |> 
+  filter(age %in% c("Y14-17", "Y_LT14"), citizen == "UA", sex=="T", TIME_PERIOD %in% c(2022, 2023), geo %in% temp_prot_UKR_UASC) |> 
   group_by(age) |> 
   summarise(values = sum(values), .groups = 'drop')
 
-print(paste0("Number of Ukrainan children granted Temp. Prot. EU 18 + EFTA (2022-2023): ", sum(temp_prot_UKR$values)))
+print(paste0("Number of Ukrainan children granted Temp. Prot. EU 18 + EFTA (2022-2023): ", sum(temp_prot_UKR_UASC$values)))
 print(paste0("Y_LT14: ", temp_prot_UKR$values[1]))
 print(paste0("Y14-17: ", temp_prot_UKR$values[2]))
 print(paste0("Number of Ukrainan UASC granted Temp. Prot. EU 18 + EFTA (2022-2023): ", sum(temp_prot_UKR_UASC$values)))
