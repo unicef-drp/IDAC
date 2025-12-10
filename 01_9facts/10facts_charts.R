@@ -1,7 +1,15 @@
+# FACT 1: Gaps ----
+gap.refugees.table <- ref.asylum |> 
+  filter(year == 2024) |> 
+  mutate(coverage.sex.age.low = coverage.sex.age < 0.5) 
+
+gap.refugee.perc <- round(100 * sum(gap.refugees.table$coverage.sex.age.low) / nrow(gap.refugees.table))
+
+
 # FACT 1: Mig Stock ----
-  
+
 fig1 <- mig.stock.0to17 |>
-  filter(sex == "both") |>
+  filter(sex == "both", year >= 2000) |>
   mutate(pop.mig.adult = pop.mig.total - pop.mig.0to17.eu) |> 
   select(year, pop.mig.adult, pop.mig.0to17.eu) |>
   group_by(year) |>
@@ -21,13 +29,13 @@ fig1.dashed2 <- tribble(~year, ~value, ~name,
 
 fact1 <- ggplot(fig1, aes(x = factor(year), y = value, group = name, color = name)) +
   geom_line(stat = "identity", position = "stack", linewidth = 2) +
-  geom_line(data = fig1.dashed, stat = "identity", linewidth = 2, linetype = "dashed", show.legend = FALSE, color = "#0092C433") +
-  geom_line(data = fig1.dashed2, stat = "identity", linewidth = 2, linetype = "dashed", show.legend = FALSE, color = "#00B40033") +
+  geom_line(data = fig1.dashed, stat = "identity", linewidth = 2, show.legend = FALSE, color = "#0092C433") +
+  geom_line(data = fig1.dashed2, stat = "identity", linewidth = 2, show.legend = FALSE, color = "#00B40033") +
   geom_text(aes(label = label), position = "stack", size = 3, fontface = "bold", vjust = -1, hjust = "center", show.legend = FALSE)+
   scale_color_manual(values = c("#0092C4", "#00B400"), 
                      breaks = c("18+ years", "Under 18 years"),
                      name = "") +
-  scale_x_discrete(breaks = c(1990, 1995, 2000, 2005, 2010, 2015, 2020, 2024)) +
+  scale_x_discrete(breaks = c(2000, 2005, 2010, 2015, 2020, 2024)) +
   xlab("Year") +
   theme_classic() +
   theme(axis.line.x = element_line(linewidth = 0.5, colour = "grey"),
@@ -39,8 +47,8 @@ fact1 <- ggplot(fig1, aes(x = factor(year), y = value, group = name, color = nam
         legend.position = "right",
         legend.text = element_text(size = 8))
 print(fact1)
-ggsave(plot = fact1,
-       filename = file.path(projectFolder, "fact1.pdf"), device = "pdf")
+ggsave(plot = fact1,width = 6, height = 3,
+       filename = file.path(projectFolder, "figure2.pdf"), device = "pdf")
 
 approx.2024 <- mig.stock.0to17 |>
   filter(sex == "both") |>
@@ -742,7 +750,7 @@ View(new.disp.conf.weat |> group_by(cause) |> summarise(idp.new.0to17 = sum(idp.
 
 g <- ggplot(new.disp.conf.weat, aes(x = factor(year), y = idp.new.0to17, fill = cause, group = cause)) + 
   geom_bar(stat = "identity", position = "dodge") + 
-  xlab("Year") + ylab("New internal displacements (in millions)") +
+  xlab("Year") + ylab("New internal displacements\n(in millions)") +
   theme_classic() +
   theme(axis.line = element_line(colour = "grey50", linewidth = 0.4),
         axis.text = element_text(size = 8, color = "grey50"), 
@@ -751,6 +759,7 @@ g <- ggplot(new.disp.conf.weat, aes(x = factor(year), y = idp.new.0to17, fill = 
         legend.position="bottom", 
         legend.title=element_blank())
 print(g)
+ggsave(file.path(projectFolder, "figure9.pdf"), width = 10, height = 7, units = "cm")
 
 ## Fact Weather ----
 weather.2016.2024.region <- idmc.new.disaster.events |> 

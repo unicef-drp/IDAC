@@ -14,7 +14,7 @@ USER        <- Sys.getenv("USER")
 
 #file paths for each user of the repository
 if (USERNAME == "palma"){
-  projectFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/IDAC/dataforchildrenonthemove.org/Data Gateway/clean_data")) #Output files
+  projectFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/IDAC/dataforchildrenonthemove.org/Downloadable datasets/clean_data")) #Output files
   repoFolder  <- file.path(file.path(Sys.getenv("USERPROFILE"), "code/IDAC/06_Data_Gateway")) #repository files
   rawdataFolder <- file.path(file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/Migration and Displacement/Data/"))  #raw data folder
 } 
@@ -124,6 +124,20 @@ ref_UNRWA <- readSDMX(providerId = "UNICEF",
 
 write.table(ref_UNRWA,
             file=file.path(projectFolder, "ref_UNRWA.csv"),
+            sep=',',
+            na='',
+            row.names=FALSE)
+
+# Refugees per capita ----
+ref.per.capita <- readSDMX(providerId = "UNICEF",
+                     resource = "data",
+                     flowRef = "MG",
+                     version = "1.0",
+                     key = ".MG_RFGS_CNTRY_ASYLM_PER1000.") |>
+  as.data.frame()
+
+write.table(ref.per.capita,
+            file=file.path(projectFolder, "ref_per_capita.csv"),
             sep=',',
             na='',
             row.names=FALSE)
