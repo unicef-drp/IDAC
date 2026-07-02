@@ -24,18 +24,19 @@ source(file.path("00_helpers/addUnits.R"))
 source(file.path("00_helpers/pies_overplot.R"))
 
 # LOAD MIGRATION DATA ----
-mig2024 <- readSDMX(providerId = "UNICEF", resource = "data", flowRef = "MG", version = "1.0",
+# TODO 2026 update: confirm these raw data files exist under rawdataFolder before running
+mig2025 <- readSDMX(providerId = "UNICEF", resource = "data", flowRef = "MG", version = "1.0",
                   key = "WORLD.MG_INTNL_MG_CNTRY_DEST.._T") |>
   as.data.frame()
 # https://sdmx.data.unicef.org/ws/public/sdmxapi/rest/data/MG/WORLD.MG_INTNL_MG_CNTRY_DEST.._T/all/
 
 #load(file.path(rawdataFolder, "UNPD/UNMigrantStock2020/UN_MigrantStockByOriginAndDestination.Rdata"))
 load(file.path(rawdataFolder, "UNPD/UNMigrantStock2020/UN_MigrantStockAge0to17.Rdata")) #country data
-load(file.path(rawdataFolder, "UNPD/UNMigrantStock2024/mig_stock_dest_orig.Rdata")) 
+load(file.path(rawdataFolder, "UNPD/UNMigrantStock2025/mig_stock_dest_orig.Rdata"))
 #load(file.path(rawdataFolder, "UNPD/UNMigrantStock2020/UN_MigrantStockAge.Rdata")) #country by age groups
-load(file.path(rawdataFolder,"IDMC/IDMC2025/idmc_2025.RData"))
-load(file.path(rawdataFolder,'UNHCR/GlobalTrends2024/UNHCR_2024.RData'))
-load(file.path(rawdataFolder, 'Asylum seekers estimate/AS_estimate_2024.RData'))
+load(file.path(rawdataFolder,"IDMC/IDMC2026/idmc_2026.RData"))
+load(file.path(rawdataFolder,'UNHCR/GlobalTrends2025/UNHCR_2025.RData'))
+load(file.path(rawdataFolder, 'Asylum seekers estimate/AS_estimate_2025.RData'))
 
 ## UNRWA data ----
 unrwa <- readSDMX(providerId = "UNICEF", resource = "data", flowRef = "MG", version = "1.0",
@@ -151,4 +152,4 @@ bnd.ssd <- bnd[bnd$BDY_CNT01 == "SDN" & bnd$BDY_CNT02 == "SSD", ] # Specify SSD-
 
 
 # CHARTS ----
-source(file.path("08_IDAC_9facts/10facts_charts.R"))
+source(file.path("01_9facts/10facts_charts.R"))

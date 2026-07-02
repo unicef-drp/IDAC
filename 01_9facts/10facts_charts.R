@@ -1,7 +1,7 @@
 # FACT 1: Gaps ----
-gap.refugees.table <- ref.asylum |> 
-  filter(year == 2024) |> 
-  mutate(coverage.sex.age.low = coverage.sex.age < 0.5) 
+gap.refugees.table <- ref.asylum |>
+  filter(year == 2025) |>
+  mutate(coverage.sex.age.low = coverage.sex.age < 0.5)
 
 gap.refugee.perc <- round(100 * sum(gap.refugees.table$coverage.sex.age.low) / nrow(gap.refugees.table))
 
@@ -20,12 +20,13 @@ fig1 <- mig.stock.0to17 |>
          label = round(value, 0))
 fig1$name <- factor(fig1$name, levels = c("18+ years", "Under 18 years"))
 
+# TODO 2026 update: 304021813, 42.5 and the 2020 anchor values are hardcoded estimates from the 2025 update and need to be replaced with real 2025 figures
 fig1.dashed <- tribble(~year, ~value, ~name,
                        2020, 245.08349 + 35.51462, NA,
-                       2024, 304021813 / 1000000, NA)
+                       2025, 304021813 / 1000000, NA)
 fig1.dashed2 <- tribble(~year, ~value, ~name,
                        2020, 35.51462, NA,
-                       2024, 42.5, NA)
+                       2025, 42.5, NA)
 
 fact1 <- ggplot(fig1, aes(x = factor(year), y = value, group = name, color = name)) +
   geom_line(stat = "identity", position = "stack", linewidth = 2) +
@@ -35,7 +36,7 @@ fact1 <- ggplot(fig1, aes(x = factor(year), y = value, group = name, color = nam
   scale_color_manual(values = c("#0092C4", "#00B400"), 
                      breaks = c("18+ years", "Under 18 years"),
                      name = "") +
-  scale_x_discrete(breaks = c(2000, 2005, 2010, 2015, 2020, 2024)) +
+  scale_x_discrete(breaks = c(2000, 2005, 2010, 2015, 2020, 2025)) +
   xlab("Year") +
   theme_classic() +
   theme(axis.line.x = element_line(linewidth = 0.5, colour = "grey"),
@@ -50,13 +51,13 @@ print(fact1)
 ggsave(plot = fact1,width = 6, height = 3,
        filename = file.path(projectFolder, "figure2.pdf"), device = "pdf")
 
-approx.2024 <- mig.stock.0to17 |>
+approx.2025 <- mig.stock.0to17 |>
   filter(sex == "both") |>
   select(year, pop.mig.total, pop.mig.0to17.eu) |>
   group_by(year) |>
-  summarise_all(sum, na.rm = T) |> 
+  summarise_all(sum, na.rm = T) |>
   mutate(pop.mig.0to17.eu.perc = pop.mig.0to17.eu / pop.mig.total,
-         approx.2024 =  round(pop.mig.0to17.eu.perc * 304021813 / 1000000))
+         approx.2025 =  round(pop.mig.0to17.eu.perc * 304021813 / 1000000)) # TODO 2026 update: replace 304021813 with the real 2025 total migrant stock estimate
 
 ## fact1.xls ----
 fact1.xls <- fig1 |> 
@@ -65,10 +66,10 @@ fact1.xls <- fig1 |>
 
 # FACT 2: Mig Origin-Dest  ----
 orig.dest.region <- mig.stock.dest.orig |>
-  filter(Location.dest %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |> 
-  filter(Location.orig %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |> 
-  filter(year == 2024) |>
-  mutate(pop.mig = pop.mig / 1000000) |> 
+  filter(Location.dest %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |>
+  filter(Location.orig %in% c("AFRICA", "EUROPE", "LATIN AMERICA AND THE CARIBBEAN", "ASIA", "NORTHERN AMERICA", "OCEANIA")) |>
+  filter(year == 2025) |>
+  mutate(pop.mig = pop.mig / 1000000) |>
   select(Location.orig, Location.dest, pop.mig)
 
 my_colors <- c("AFRICA" = "#00B520", 
@@ -148,47 +149,48 @@ fact2.xls <- orig.dest.region
 fact4.idmc <- idmc.stock |> 
   filter(cause == "Conflict" & sex == "Both sexes") 
 
-## Correcting Gaza 2023-2024 --------------------------------------------------------------------------------------------------------------
-#IDMC estimates that in 2023-2024, 70% of IDPs in Gaza are also registered as UNRWA refugees
+## Correcting Gaza 2024-2025 --------------------------------------------------------------------------------------------------------------
+# TODO 2026 update: verify against the new IDMC/UNRWA reports that the 70%/30% split still applies to 2024-2025 before running
+#IDMC estimates that in 2024-2025, 70% of IDPs in Gaza are also registered as UNRWA refugees
 # To correct for this, we remove these registered refugees from IDMC numbers by conflict
-# We only keep 30% of the numbers from PSE in 2023 and 2024.
+# We only keep 30% of the numbers from PSE in 2024 and 2025.
 # Because IDMC uses 3 groups for 0-17 data, we remove 70% from all groups
 
 # See: https://www.unhcr.org/refugee-statistics/insights/explainers/forcibly-displaced-pocs.html (Acessed on 2025-10-13)
 # Website saved as PDF in \Migration and Displacement/Forcibly displaced and stateless population categories _ UNHCR.pdf
-fact4.idmc[fact4.idmc$year %in% c(2023,2024) & fact4.idmc$ISO3Code == "PSE", 6:12] <- fact4.idmc[fact4.idmc$year %in% c(2023,2024) & fact4.idmc$ISO3Code == "PSE", 6:12] * .3
+fact4.idmc[fact4.idmc$year %in% c(2024,2025) & fact4.idmc$ISO3Code == "PSE", 6:12] <- fact4.idmc[fact4.idmc$year %in% c(2024,2025) & fact4.idmc$ISO3Code == "PSE", 6:12] * .3
 
 fact4.idmc <- fact4.idmc |> 
   group_by(year)|> 
-  summarise(pop = sum(idp.stock, na.rm = T),
-            pop.0to17 = sum(idp.stock.0to17, na.rm = T)) |> 
-  mutate(pop.type = "Conflict-related\ninternally displaced children") |> 
-  select(year, pop.type, pop, pop.0to17) 
+  summarise(pop = sum(idp.stock, na.rm = TRUE),
+            pop.0to17 = sum(idp.stock.0to17, na.rm = TRUE)) |>
+  mutate(pop.type = "Conflict-related\ninternally displaced children") |>
+  select(year, pop.type, pop, pop.0to17)
 
 fact4.unrwa <- unrwa |> 
   mutate(year = as.numeric(TIME_PERIOD),
          pop = as.numeric(OBS_VALUE) * (AGE == "_T"),
-         pop.0to17 = as.numeric(OBS_VALUE) * (AGE == "Y0T17")) |> 
-  group_by(year) |> 
+         pop.0to17 = as.numeric(OBS_VALUE) * (AGE == "Y0T17")) |>
+  group_by(year) |>
   summarise(pop = sum(pop),
-            pop.0to17 = sum(pop.0to17)) |> 
-  mutate(pop.type = "Palestine refugee children\n(registered with UNRWA)") |> 
-  select(year, pop.type, pop, pop.0to17) 
+            pop.0to17 = sum(pop.0to17)) |>
+  mutate(pop.type = "Palestine refugee children\n(registered with UNRWA)") |>
+  select(year, pop.type, pop, pop.0to17)
 #fact4.unrwa$pop.0to17[fact4.unrwa$pop.0to17 == 0] <- NA  #Values are not zero, should be NA
 
-fact4.unhcr <- ref.asylum |> 
-  group_by(year)|> 
-  summarise(pop = sum(ref, na.rm = T),
-            pop.0to17 = sum(ref.0to17.estimate, na.rm = T)) |> 
+fact4.unhcr <- ref.asylum |>  
+  group_by(year) |>
+  summarise(pop = sum(ref, na.rm = TRUE),
+            pop.0to17 = sum(ref.0to17.estimate, na.rm = TRUE)) |>
   mutate(pop.type = "Refugee and other internationally\ndisplaced children (UNHCR)") |> 
   select(year, pop.type, pop, pop.0to17) 
 
-fact4.AS <- AS.estimate |> 
-  group_by(year)|> 
-  summarise(pop = sum(AS , na.rm = T),
-            pop.0to17 = sum(AS.0to17.estimated , na.rm = T)) |> 
+fact4.AS <- AS.estimate |>
+  group_by(year) |> 
+  summarise(pop = sum(AS , na.rm = TRUE),
+            pop.0to17 = sum(AS.0to17.estimated , na.rm = TRUE)) |> 
   mutate(pop.type = "Asylum-seeking children") |> 
-  select(year, pop.type, pop, pop.0to17) 
+  select(year, pop.type, pop, pop.0to17)
 
 fact4 <- bind_rows(fact4.idmc,
                    fact4.unhcr,
@@ -196,40 +198,40 @@ fact4 <- bind_rows(fact4.idmc,
                    fact4.AS)
 
 fact4.yearly.summary <- fact4 |>
-  group_by(year)|> 
+  group_by(year) |>
   summarise(pop = sum(pop),
-            pop.0to17 = sum(pop.0to17),.groups = "drop") |> 
-  mutate(pop.0to17.prop = pop.0to17/pop,
+            pop.0to17 = sum(pop.0to17), .groups = "drop") |>
+  mutate(pop.0to17.prop = pop.0to17 / pop,
          pop = round(pop / 1000000, digits = 1),
          pop.0to17 = round(pop.0to17 / 1000000, digits = 1))
 
-fact4.2024.summary <- fact4 |>
-  filter(year == 2024) |> 
-  group_by(pop.type) |> 
+fact4.2025.summary <- fact4 |>
+  filter(year == 2025) |>
+  group_by(pop.type) |>
   summarise(pop.0to17 = sum(pop.0to17), .groups = "drop")
 
-fact4.total <- fact4 |> 
-  filter(year %in% 2010:2024) |> 
+fact4.total <- fact4 |>
+  filter(year %in% 2010:2025) |>
   group_by(year) |>
-  summarise(pop.0to17 = sum(pop.0to17)) |> 
+  summarise(pop.0to17 = sum(pop.0to17)) |>
   mutate(pop.type = "Total forcibly displaced children")
 
-fact4.2018.plus <- fact4 |> 
+fact4.2018.plus <- fact4 |>
   filter(year >= 2018) |>
-  select (-pop)
+  select(-pop)
 
-fact4_new <- bind_rows(fact4.total, fact4.2018.plus) |> 
+fact4_new <- bind_rows(fact4.total, fact4.2018.plus) |>
   mutate(pop.0to17 = pop.0to17 / 1000000,
          pop.label = round(pop.0to17, digits = 1),
          show.bar = if_else(pop.type == "Total forcibly displaced children" & year >= 2018, FALSE, TRUE))
 
-fact4.2024.unhcrunrwa <- fact4 |> 
+fact4.2025.unhcrunrwa <- fact4 |>
   filter(pop.type %in% c("Refugee and other internationally\ndisplaced children (UNHCR)",
                          "Palestine refugee children\n(registered with UNRWA)",
-                         "Asylum-seeking children") ) |> 
-  filter(year == 2024) |> 
+                         "Asylum-seeking children")) |>
+  filter(year == 2025) |>
   summarise(pop = sum(pop),
-            pop.0to17 = sum(pop.0to17)) |> 
+            pop.0to17 = sum(pop.0to17)) |>
   mutate(perc = round(100 * pop.0to17 / pop))
 
 
@@ -254,18 +256,18 @@ fact4.fig <- ggplot(fact4_new |> filter(show.bar), aes(x = factor(year), y = pop
             colour = "white", size = 3, fontface = "bold",
             position = position_stack(vjust = 0.5))+
   geom_text(data = fact4_new |> filter(pop.type == "Total forcibly displaced children"), 
-            mapping = aes(label = pop.label, y = pop.0to17), 
+            mapping = aes(label = pop.label, y = pop.0to17),
             colour = "#0092C4", size = 4, fontface = "bold", vjust = -.3)+
   scale_fill_manual(values = cols,
                     name = "") +
-  scale_x_discrete(breaks = 2010:2024) +
+  scale_x_discrete(breaks = 2010:2025) +
   scale_y_continuous(limits = c(0, 50)) +
   labs(x = NULL, y = NULL)+
   theme_classic() +
   guides(fill = guide_legend(nrow = 2, byrow = TRUE))+
   theme(axis.line = element_line(colour = "grey50", linewidth = 0.4),
         axis.text = element_text(size = 8, color = "grey50"), 
-        axis.ticks = element_line(colour = "grey50", linewidth = 0.4), 
+        axis.ticks = element_line(colour = "grey50", linewidth = 0.4),
         axis.title = element_text(size = 8, color = "grey50"),
         legend.position="bottom", 
         legend.title=element_blank(), 
@@ -279,11 +281,11 @@ ggsave(filename = file.path(projectFolder, "fact4.pdf"),
 fact4.xls <- fact4_new
 
 # FACT 5: Refugee Origin ----
-fact5 <- ref.origin |> 
-  filter(year == 2024) |> 
-  filter(!(ISO3Code %in% c("UNK", "XXA", "TIB", "LUX", "PLW")) ) |> 
+fact5 <- ref.origin |>
+  filter(year == 2025) |>
+  filter(!(ISO3Code %in% c("UNK", "XXA", "TIB", "LUX", "PLW"))) |>
   select(ISO3Code, ref.0to17.estimate) |> 
-  left_join(geo_areas , by = c("ISO3Code" = "id")) |> 
+  left_join(geo_areas , by = c("ISO3Code" = "id")) |>
   left_join(regions_sdg |> select(Region, Region_Code, ISO3Code), by = "ISO3Code")
 
 #Fixing country labels
@@ -295,8 +297,8 @@ fact5$country.label[fact5$ref.0to17.estimate < 100000] <- NA
 
 ## Analysis by Region ----
 fact5_region <- fact5 |>
-  group_by(Region_Code) |> 
-  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |> 
+  group_by(Region_Code) |>
+  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |>
   arrange(desc(ref.0to17.region)) |> 
   mutate(ref.0to17.region.mill = round(ref.0to17.region / 1000000, digits = 1),
          ref.0to17.region.perc = 100 * ref.0to17.region / sum(ref.0to17.region),
@@ -304,7 +306,7 @@ fact5_region <- fact5 |>
 View(fact5_region)
 
 fact5_toView <- fact5 |>
-  arrange(desc(ref.0to17.estimate)) |> 
+  arrange(desc(ref.0to17.estimate)) |>
   mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
          ref.0to17.estimate.perc.cumul = round(cumsum(ref.0to17.estimate.perc)),
          ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
@@ -312,13 +314,13 @@ fact5_toView <- fact5 |>
          ref.0to17.estimate.mill = round(ref.0to17.estimate / 1000000, digits = 1)) |> 
   left_join(fact5_region |> select(Region_Code, ref.0to17.region), by = "Region_Code") |> 
   mutate(perc.of.region = round(100 * (ref.0to17.estimate / ref.0to17.region))) |> 
-  select(ISO3Code, name, 
+  select(ISO3Code, name,
          ref.0to17.estimate, ref.0to17.estimate.mill, ref.0to17.estimate.perc, ref.0to17.estimate.perc.cumul,
          Region_Code, perc.of.region)
 View(fact5_toView)
 
 fact5_toView_ssa <- fact5 |>
-  filter(Region_Code == "UNSDG_SUBSAHARANAFRICA")|>
+  filter(Region_Code == "UNSDG_SUBSAHARANAFRICA") |>
   arrange(desc(ref.0to17.estimate)) |> 
   mutate(ref.0to17.estimate.perc = 100 * ref.0to17.estimate / sum(ref.0to17.estimate),
          cumul.perc = round(cumsum(ref.0to17.estimate.perc)),
@@ -434,8 +436,8 @@ fact5.xls <- fact5 |>
   select(name, Region, OBS_VALUE)
 
 # FACT 6: Refugee Asylum ----
-fact6 <- ref.asylum |> 
-  filter(year == 2024) |> 
+fact6 <- ref.asylum |>
+  filter(year == 2025) |>
   filter(!(ISO3Code %in% c("UNK", "XXA", "TIB", "LUX", "PLW")) ) |> 
   select(ISO3Code, ref.0to17.estimate) |> 
   left_join(geo_areas , by = c("ISO3Code" = "id")) |> 
@@ -448,9 +450,9 @@ fact6$country.label[fact6$ref.0to17.estimate < 100000] <- NA
 
 ## Analysis by Region ----
 fact6_region <- fact6 |>
-  group_by(Region_Code) |> 
-  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |> 
-  arrange(desc(ref.0to17.region)) |> 
+  group_by(Region_Code) |>
+  summarise(ref.0to17.region = sum(ref.0to17.estimate)) |>
+  arrange(desc(ref.0to17.region)) |>
   mutate(ref.0to17.region.mill = round(ref.0to17.region / 1000000, digits = 1),
          ref.0to17.region.perc = round(100 * ref.0to17.region / sum(ref.0to17.region)))
 View(fact6_region)
@@ -474,10 +476,10 @@ fact6_toView <- fact6 |>
          ref.0to17.estimate.perc = round(ref.0to17.estimate.perc),
          ref.0to17.estimate = round(signif(ref.0to17.estimate, digits = 2)),
          ref.0to17.estimate.mill = round(ref.0to17.estimate / 1000000, digits = 1),
-         ref.0to17.estimate.thsd = signif(ref.0to17.estimate, digits = 2)) |> 
-  left_join(fact6_region |> select(Region_Code, ref.0to17.region), by = "Region_Code") |> 
-  mutate(perc.of.region = round(100 * (ref.0to17.estimate / ref.0to17.region))) |> 
-  select(ISO3Code, name, 
+         ref.0to17.estimate.thsd = signif(ref.0to17.estimate, digits = 2)) |>
+  left_join(fact6_region |> select(Region_Code, ref.0to17.region), by = "Region_Code") |>
+  mutate(perc.of.region = round(100 * (ref.0to17.estimate / ref.0to17.region))) |>
+  select(ISO3Code, name,
          ref.0to17.estimate, ref.0to17.estimate.mill, ref.0to17.estimate.thsd,
          ref.0to17.estimate.perc, ref.0to17.estimate.perc.cumul, 
          Region_Code, perc.of.region)
@@ -653,7 +655,7 @@ unpd.map <- function(){
   {
     draw.circle(x = pop.mig.in.centroids$x[i], 
                 y = pop.mig.in.centroids$y[i],
-                radius = 0.3 * pop.mig.in.centroids$pop.mig.0to17[i], 
+                radius = 0.3 * pop.mig.in.centroids$pop.mig.0to17[i],
                 border = "#52525290", col = "#52525280")}
 }
 
@@ -674,7 +676,7 @@ fact3.xls <- data3 |>
 # FACT 7 and 8 : MAP IDP and IDP NEW----
 ## Fact 7 summary----
 fact7.idmc.stock <- idmc.stock |>
-  filter(year == 2024) |> 
+  filter(year == 2025) |>
   filter(sex == "Both sexes") |> 
   left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code")
 
@@ -697,16 +699,16 @@ idmc.stock.summary.region <-  fact7.idmc.stock |>
          pop.0to17.millions = round(pop.0to17 / 1000000, digits = 1))
 View(idmc.stock.summary.region)
 
-idmc.stock.2024 <-  idmc.stock |> 
-  filter(year == 2024, sex == "Both sexes") |> 
+idmc.stock.2025 <-  idmc.stock |>
+  filter(year == 2025, sex == "Both sexes") |>
   summarise(pop = sum(idp.stock, na.rm = T),
-            pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop') |> 
+            pop.0to17 = sum(idp.stock.0to17, na.rm = T), .groups = 'drop') |>
   mutate(perc = round(100 * pop.0to17 / pop, digits = 1))
-idmc.stock.2024
+idmc.stock.2025
 
 ## Fact 8 summary----
-fact8.idmc.new <- idmc.new |> 
-  filter(year == 2024) |> 
+fact8.idmc.new <- idmc.new |>
+  filter(year == 2025) |>
   left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") 
 
 idmc.new.summary <- fact8.idmc.new |> 
@@ -731,19 +733,19 @@ idmc.new.summary.region.dis <- fact8.idmc.new|>
 View(idmc.new.summary.region.dis)
 
 ## Fact Weather vs Conflict----
-conflict.2016.2024 <- idmc.new |> 
+conflict.2016.2025 <- idmc.new |> 
   filter(year >= 2016, cause == "Conflict") |>
   group_by(year) |> 
   summarise(idp.new.0to17 = sum(idp.new.0to17, na.rm = T)) |> 
   mutate(cause = "Conflict and violence")
 
-weather.2016.2024 <- idmc.new.disaster.events |> 
+weather.2016.2025 <- idmc.new.disaster.events |> 
   filter(year >= 2016, hazard.cat == "Weather related") |>
   group_by(year) |> 
   summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T)) |> 
   mutate(cause = "Weather")
 
-new.disp.conf.weat <- bind_rows(conflict.2016.2024, weather.2016.2024) |> 
+new.disp.conf.weat <- bind_rows(conflict.2016.2025, weather.2016.2025) |> 
   mutate(idp.new.0to17 = idp.new.0to17 / 1000000)
 
 View(new.disp.conf.weat |> group_by(cause) |> summarise(idp.new.0to17 = sum(idp.new.0to17)) |> mutate(idp.new.0to17.mill = round(idp.new.0to17)))
@@ -762,20 +764,20 @@ print(g)
 ggsave(file.path(projectFolder, "figure9.pdf"), width = 10, height = 7, units = "cm")
 
 ## Fact Weather ----
-weather.2016.2024.region <- idmc.new.disaster.events |> 
+weather.2016.2025.region <- idmc.new.disaster.events |> 
   filter(year >= 2016, hazard.cat == "Weather related") |>
   left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
   group_by(Region) |> 
   summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T)) 
 
-drought.2016.2024.region <- idmc.new.disaster.events |> 
+drought.2016.2025.region <- idmc.new.disaster.events |> 
   filter(year >= 2016, hazard.type == "Drought") |>
   left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
   group_by(Region) |> 
   summarise(idp.new.0to17 = sum(idp.dis.new.0to17, na.rm = T), .groups = "drop") |> 
   mutate(perc = round(100 * idp.new.0to17 / sum(idp.new.0to17)))
 
-storm.2016.2024.region <- idmc.new.disaster.events |> 
+storm.2016.2025.region <- idmc.new.disaster.events |> 
   filter(year >= 2016, hazard.type == "Storm") |>
   left_join(regions_sdg |> select(ISO3Code, Region), by = "ISO3Code") |> 
   group_by(Region) |> 
