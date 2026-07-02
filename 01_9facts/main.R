@@ -1,8 +1,15 @@
 # Project: IDAC 10 Facts for children on the move
 # Script: Main file
 
-# PROFILE ----
-source(file.path("01_9facts/profile.R"))
+rm(list = ls())
+
+# PATHS ----
+projectFolder <- file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/Migration and Displacement/IDAC Working Documents/J. IDAC Publications/9 facts/Version_2025/output") #Output files
+repoFolder    <- file.path(Sys.getenv("USERPROFILE"), "code/IDAC/01_9facts") #repository files
+rawdataFolder <- file.path(Sys.getenv("USERPROFILE"), "OneDrive - UNICEF/Migration and Displacement/Data/") #raw data folder
+
+stopifnot(dir.exists(projectFolder))
+stopifnot(dir.exists(repoFolder))
 
 # PACKAGES ----
 library(pacman)

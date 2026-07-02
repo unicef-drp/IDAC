@@ -14,8 +14,6 @@ See [*DW_DemogMigration/03_raw_to_RData*](https://github.com/unicef-drp/DW-Demog
 
 ### 2. Update scripts
 
--   *profile.R*
-
 -   *main.R*
 
 -   *9facts_charts.R*
@@ -29,6 +27,12 @@ See [*DW_DemogMigration/03_raw_to_RData*](https://github.com/unicef-drp/DW-Demog
 -   The route map in fact 9 is in inDesign files. See *Migration and Displacement/AllianceIDAC/IDAC_9_FACTS/Version_2022_10/Fact 9 InDesign files*
 
 ## Updates
+
+2026.07.02
+
+-   Start of 2026 update: rolled data year filters/ranges and raw data source paths forward to 2025/2026.
+
+-   Merged *profile.R* into *main.R* and dropped the multi-user path branching (single user of these scripts now).
 
 2025.10.07
 
