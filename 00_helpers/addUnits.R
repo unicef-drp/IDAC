@@ -1,3 +1,4 @@
+# Formats a number with a magnitude suffix (k/M/B/T), e.g. 2500000 -> "2.5M"
 addUnits <- function(n, digits = 0) {
   labels <- ifelse(n < 1000, n,  # less than thousands
                    ifelse(n < 1e6, paste0(round(n/1e3, digits = digits), 'k'),  # in thousands
@@ -9,6 +10,7 @@ addUnits <- function(n, digits = 0) {
   return(labels)
 }
 
+# Formats a number in millions with 1 decimal place, e.g. 2500000 -> "2.5M"
 format_million <- function(x){
   return(paste0(round(x/1000000, digits=1), "M"))
 }
